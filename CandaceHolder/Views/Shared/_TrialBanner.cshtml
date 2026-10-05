@@ -1,0 +1,18 @@
+@{
+    var daysLeft = ViewData["TrialDaysLeft"] as int?;
+}
+@if (daysLeft.HasValue)
+{
+    <div class="bg-orange-500/10 border-b border-orange-500/30 text-orange-300 text-xs sm:text-sm text-center py-2 px-4">
+        <i class="fa-solid fa-clock mr-1.5"></i>
+        @if (daysLeft.Value <= 0)
+        {
+            <span>Your Pro trial ends today.</span>
+        }
+        else
+        {
+            <span>@daysLeft.Value day@(daysLeft.Value == 1 ? "" : "s") left in your Pro trial.</span>
+        }
+        <a href="/Billing/Upgrade" class="underline font-semibold hover:text-orange-200 ml-1">Upgrade now</a>
+    </div>
+}

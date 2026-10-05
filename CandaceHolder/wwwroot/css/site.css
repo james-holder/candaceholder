@@ -1,0 +1,164 @@
+/* ══════════════════════════════════════════════════════════════
+   StormLead Pro — Global Stylesheet
+   Loaded by every page. Page-specific rules live in their own
+   CSS files (admin.css, login.css, saved-leads.css).
+══════════════════════════════════════════════════════════════ */
+
+/* ── Reset / Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+    background: #0f172a;
+    color: #e2e8f0;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    margin: 0;
+}
+
+/* ── Stat cards (Dashboard + Admin) ──────────────────────── */
+.stat-card {
+    background: #1e293b;
+    border: 1px solid rgba(51,65,85,0.6);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: rgba(249,115,22,0.4); }
+
+/* ── Risk badges ─────────────────────────────────────────── */
+.badge-high   { background: rgba(239,68,68,0.15);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); }
+.badge-medium { background: rgba(249,115,22,0.15); color: #fdba74; border: 1px solid rgba(249,115,22,0.4); }
+.badge-low    { background: rgba(34,197,94,0.15);  color: #86efac; border: 1px solid rgba(34,197,94,0.4); }
+
+/* ── Filter buttons ──────────────────────────────────────── */
+.filter-btn { transition: background 0.15s, color 0.15s; }
+.filter-btn.active { background: #f97316; color: #fff; }
+
+/* ── Scan button progress bar ────────────────────────────── */
+#scanProgressBar {
+    /* Adds a moving shimmer on top of the fill */
+    background: linear-gradient(
+        90deg,
+        rgba(255,255,255,0.06) 0%,
+        rgba(255,255,255,0.20) 50%,
+        rgba(255,255,255,0.06) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    box-shadow: 2px 0 12px rgba(255,255,255,0.25);
+}
+@keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+}
+
+/* ── Spinner (kept for other uses) ──────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { animation: spin 0.8s linear infinite; }
+
+/* ── Toast ───────────────────────────────────────────────── */
+#toast {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 9999;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    transform: translateY(80px);
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    pointer-events: none;
+}
+#toast.show    { transform: translateY(0); opacity: 1; }
+#toast.success { background: #166534; border: 1px solid #16a34a; color: #bbf7d0; }
+#toast.error   { background: #7f1d1d; border: 1px solid #dc2626; color: #fecaca; }
+
+/* ── Home page: map ─────────────────────────────────────── */
+#map { height: 520px; border-radius: 12px; }
+
+/* ── Home page: Google autocomplete dropdown z-index fix ── */
+.pac-container { z-index: 9999 !important; }
+
+/* ── Home page: hero gradient ────────────────────────────── */
+.hero-gradient {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+}
+
+/* ── Home page: property cards ───────────────────────────── */
+.prop-card {
+    transition: box-shadow 0.18s, transform 0.18s, border-color 0.18s;
+    border: 1.5px solid transparent;
+}
+.prop-card:hover {
+    box-shadow: 0 0 0 2px #f97316, 0 8px 24px rgba(0,0,0,0.45);
+    transform: translateY(-2px);
+    border-color: #f97316;
+}
+.prop-card.highlighted {
+    border-color: #f97316;
+    box-shadow: 0 0 0 2px #f97316, 0 8px 32px rgba(249,115,22,0.25);
+}
+.prop-card.selected { border-color: #f97316; background: rgba(249,115,22,0.06); }
+
+/* ── Home page: lead checkboxes ──────────────────────────── */
+.lead-check { accent-color: #f97316; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+
+/* ── Home page: summary count badges ────────────────────── */
+.summary-badge { transition: transform 0.2s; }
+.summary-badge:hover { transform: scale(1.05); }
+
+/* ── Home page: card list scrollbar ─────────────────────── */
+.card-scroll::-webkit-scrollbar       { width: 6px; }
+.card-scroll::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
+.card-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+.card-scroll::-webkit-scrollbar-thumb:hover { background: #f97316; }
+
+/* ── Leaflet marker override ─────────────────────────────── */
+.leaflet-div-icon { background: transparent; border: none; }
+
+/* ── Data source badges (NOAA / EST) on property cards ───── */
+.source-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    vertical-align: middle;
+    line-height: 1.4;
+}
+.source-badge--noaa {
+    background: rgba(14,165,233,0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(14,165,233,0.3);
+}
+.source-badge--est {
+    background: rgba(100,116,139,0.2);
+    color: #94a3b8;
+    border: 1px solid rgba(100,116,139,0.3);
+}
+.source-badge--lsr {
+    background: rgba(34,197,94,0.12);
+    color: #4ade80;
+    border: 1px solid rgba(34,197,94,0.3);
+}
+
+/* ── Claim window banners on property cards ────────────────── */
+.claim-hot {
+    background: rgba(249,115,22,0.12);
+    border: 1px solid rgba(249,115,22,0.35);
+    animation: pulse-hot 2.5s ease-in-out infinite;
+}
+.claim-fileable {
+    background: rgba(234,179,8,0.10);
+    border: 1px solid rgba(234,179,8,0.30);
+}
+@keyframes pulse-hot {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); }
+    50%       { box-shadow: 0 0 0 4px rgba(249,115,22,0.15); }
+}

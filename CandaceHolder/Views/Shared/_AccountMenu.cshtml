@@ -1,0 +1,41 @@
+@* Desktop collapsible account dropdown — shown next to the user's name in the
+   top nav. Replaces the old plain "name + Sign out" block. See
+   _AccountMenuMobile.cshtml for the mobile drawer equivalent. *@
+@if (User.Identity?.IsAuthenticated == true)
+{
+    <div class="relative">
+        <button type="button" id="accountMenuBtn" onclick="toggleAccountMenu()"
+                class="flex items-center gap-1.5 text-slate-300 hover:text-white text-xs transition-colors">
+            <i class="fa-solid fa-circle-user text-brand"></i>
+            <span>@User.Identity.Name</span>
+            <i class="fa-solid fa-chevron-down text-[10px] text-slate-500"></i>
+        </button>
+        <div id="accountMenu"
+             class="hidden absolute right-0 top-full mt-2 w-56 bg-slate-800 border border-slate-700/60 rounded-xl shadow-2xl py-2 z-50">
+            <a href="/Account/Profile" class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors">
+                <i class="fa-solid fa-user w-4 text-center text-xs"></i>My Profile
+            </a>
+            <a href="/Company/Settings" class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors">
+                <i class="fa-solid fa-building w-4 text-center text-xs"></i>Company Profile
+            </a>
+            <a href="/Team" class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors">
+                <i class="fa-solid fa-users w-4 text-center text-xs"></i>Team
+            </a>
+            <a href="/Billing/Upgrade" class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors">
+                <i class="fa-solid fa-credit-card w-4 text-center text-xs"></i>Plans &amp; Billing
+            </a>
+            <div class="border-t border-slate-700/60 my-1"></div>
+            <a href="/Auth/Logout" class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-400 hover:text-red-300 hover:bg-slate-700/60 transition-colors">
+                <i class="fa-solid fa-right-from-bracket w-4 text-center text-xs"></i>Sign out
+            </a>
+        </div>
+    </div>
+
+    <script src="~/js/account-menu.js" asp-append-version="true"></script>
+}
+else
+{
+    <a href="/Auth/Login" class="px-3 py-1 rounded-full bg-brand/10 text-brand border border-brand/30 text-xs font-semibold hover:bg-brand/20 transition-colors">
+        <i class="fa-solid fa-right-to-bracket mr-1"></i>Sign In
+    </a>
+}

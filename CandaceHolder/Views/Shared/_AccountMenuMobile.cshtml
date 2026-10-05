@@ -1,0 +1,38 @@
+@* Mobile drawer collapsible account menu — accordion that expands under the
+   user's name to reveal My Profile / Company Profile / Team / Sign out.
+   See _AccountMenu.cshtml for the desktop dropdown equivalent. *@
+@if (User.Identity?.IsAuthenticated == true)
+{
+    <button type="button" id="accountMenuBtnMobile" onclick="toggleAccountMenuMobile()"
+            class="flex items-center justify-between w-full px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+        <span class="flex items-center gap-3">
+            <i class="fa-solid fa-circle-user text-brand w-4 text-center text-xs"></i>@User.Identity.Name
+        </span>
+        <i id="accountMenuIconMobile" class="fa-solid fa-chevron-down text-xs text-slate-500"></i>
+    </button>
+    <div id="accountMenuMobile" class="hidden flex-col gap-1 pl-4">
+        <a href="/Account/Profile" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-user w-4 text-center text-xs"></i>My Profile
+        </a>
+        <a href="/Company/Settings" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-building w-4 text-center text-xs"></i>Company Profile
+        </a>
+        <a href="/Team" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-users w-4 text-center text-xs"></i>Team
+        </a>
+        <a href="/Billing/Upgrade" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-credit-card w-4 text-center text-xs"></i>Plans &amp; Billing
+        </a>
+        <a href="/Auth/Logout" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-400 hover:text-red-300 hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-right-from-bracket w-4 text-center text-xs"></i>Sign out
+        </a>
+    </div>
+
+    <script src="~/js/account-menu.js" asp-append-version="true"></script>
+}
+else
+{
+    <a href="/Auth/Login" class="flex items-center gap-3 px-3 py-3 rounded-xl bg-brand/10 border border-brand/30 text-brand text-sm font-semibold">
+        <i class="fa-solid fa-right-to-bracket"></i>Sign In
+    </a>
+}

@@ -1,0 +1,360 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@{
+    Layout = null;
+    // James, 2026-07-16: the pricing-refresh punchlist's Workstream B4 (2026-07-14)
+    // gated enrichment out of the "How it works" step copy on this page, but missed
+    // this separate Features grid further down — it was still unconditionally
+    // advertising "One-click owner lookup" while FeatureFlags:EnrichmentEnabled is
+    // false, i.e. marketing a feature that isn't actually live. Gated the same way
+    // Help/Index.cshtml already gates its enrichment section.
+    var enrichmentEnabled = Configuration.GetValue<bool>("FeatureFlags:EnrichmentEnabled");
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StormLead Pro — Roofing Leads Powered by Real Hail Data</title>
+    <meta name="description" content="Find storm-damaged roofs before your competition. StormLead Pro combines real NOAA hail data with actual property addresses to surface high-probability roofing leads in seconds." />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/js/tailwind-config-landing.js" asp-append-version="true"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <style>
+        html { scroll-behavior: smooth; }
+        .gradient-text {
+            background: linear-gradient(135deg, #f97316, #fb923c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-glow {
+            background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(249,115,22,0.15), transparent);
+        }
+        .card-hover {
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            border-color: rgba(249,115,22,0.4);
+        }
+        .pricing-popular {
+            position: relative;
+        }
+        .pricing-popular::before {
+            content: 'MOST POPULAR';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #f97316;
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            padding: 3px 12px;
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white font-sans antialiased">
+
+    <!-- ── Nav ─────────────────────────────────────────────────────────── -->
+    <nav class="fixed top-0 left-0 right-0 z-50 border-b border-slate-800/60 backdrop-blur-md bg-slate-950/80">
+        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-brand flex items-center justify-center">
+                    <i class="fa-solid fa-cloud-bolt text-white text-sm"></i>
+                </div>
+                <span class="font-bold text-white text-lg tracking-tight">StormLead <span class="text-brand">Pro</span></span>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="#pricing" class="text-sm text-slate-400 hover:text-white transition hidden sm:block">Pricing</a>
+                <a href="/Help"    class="text-sm text-slate-400 hover:text-white transition hidden sm:block">Help</a>
+                <a href="/Auth/Login" class="text-sm text-slate-400 hover:text-white transition">Log in</a>
+                <a href="/Auth/Register" class="text-sm bg-brand hover:bg-orange-400 text-white font-semibold px-4 py-2 rounded-lg transition">
+                    Get Started Free
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ── Hero ─────────────────────────────────────────────────────────── -->
+    <section class="hero-glow pt-32 pb-24 px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="inline-flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-full px-4 py-1.5 text-sm text-slate-300 mb-8">
+                <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                Powered by real NOAA hail data — no estimates
+            </div>
+
+            <h1 class="text-5xl sm:text-6xl lg:text-7xl font-black leading-tight tracking-tight mb-6">
+                Find storm-damaged roofs<br />
+                <span class="gradient-text">before your competition does.</span>
+            </h1>
+
+            <p class="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+                StormLead Pro scans any neighborhood using real NOAA hail records and actual property addresses to surface your highest-probability roofing leads — in seconds, not hours.
+            </p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <a href="/Auth/Register"
+                   class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-brand hover:bg-orange-400 text-white font-bold text-base px-8 py-4 rounded-xl transition shadow-lg shadow-orange-500/20">
+                    <i class="fa-solid fa-bolt"></i>
+                    Start for Free — No Credit Card
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Trust bar ─────────────────────────────────────────────────────── -->
+    <div class="border-y border-slate-800/60 bg-slate-900/50 py-5 px-6">
+        <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-8 text-sm text-slate-500">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-cloud-sun-rain text-sky-400"></i>
+                <span>Real NOAA SWDI hail data</span>
+            </div>
+            <div class="w-px h-4 bg-slate-700 hidden sm:block"></div>
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-map-location-dot text-green-400"></i>
+                <span>OpenStreetMap addresses</span>
+            </div>
+            <div class="w-px h-4 bg-slate-700 hidden sm:block"></div>
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-file-lines text-violet-400"></i>
+                <span>Regrid parcel records</span>
+            </div>
+            <div class="w-px h-4 bg-slate-700 hidden sm:block"></div>
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved text-brand"></i>
+                <span>No fake data, ever</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── How it works ──────────────────────────────────────────────────── -->
+    <section id="how-it-works" class="py-24 px-6">
+        <div class="max-w-5xl mx-auto">
+            <div class="text-center mb-16">
+                <p class="text-brand font-semibold text-sm uppercase tracking-widest mb-3">How it works</p>
+                <h2 class="text-3xl sm:text-4xl font-black">From address to lead list in under 60 seconds.</h2>
+            </div>
+
+            <div class="grid sm:grid-cols-3 gap-8">
+                <div class="relative">
+                    <div class="w-10 h-10 rounded-xl bg-brand/10 border border-brand/30 flex items-center justify-center text-brand font-black text-lg mb-5">1</div>
+                    <h3 class="text-lg font-bold text-white mb-2">Scan a neighborhood</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Enter any address and choose a radius. We pull every residential property from OpenStreetMap and cross-reference each one against NOAA hail records.</p>
+                    <div class="hidden sm:block absolute top-5 left-full w-full h-px border-t border-dashed border-slate-700 -translate-x-4"></div>
+                </div>
+                <div class="relative">
+                    <div class="w-10 h-10 rounded-xl bg-brand/10 border border-brand/30 flex items-center justify-center text-brand font-black text-lg mb-5">2</div>
+                    <h3 class="text-lg font-bold text-white mb-2">Review risk scores</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Every property gets a High / Medium / Low risk rating based on real hail size and storm recency. High-risk leads rise to the top automatically.</p>
+                    <div class="hidden sm:block absolute top-5 left-full w-full h-px border-t border-dashed border-slate-700 -translate-x-4"></div>
+                </div>
+                <div>
+                    <div class="w-10 h-10 rounded-xl bg-brand/10 border border-brand/30 flex items-center justify-center text-brand font-black text-lg mb-5">3</div>
+                    <h3 class="text-lg font-bold text-white mb-2">Save & download</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Save your best leads, then generate a branded PDF hail report for each one to bring to the door.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Features ──────────────────────────────────────────────────────── -->
+    <section class="py-24 px-6 bg-slate-900/40 border-y border-slate-800/60">
+        <div class="max-w-5xl mx-auto">
+            <div class="text-center mb-16">
+                <p class="text-brand font-semibold text-sm uppercase tracking-widest mb-3">Features</p>
+                <h2 class="text-3xl sm:text-4xl font-black">Built for roofers, not data scientists.</h2>
+            </div>
+
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div class="card-hover bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6">
+                    <div class="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-cloud-showers-heavy text-sky-400"></i>
+                    </div>
+                    <h3 class="font-bold text-white mb-2">Real NOAA hail data</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Every risk score is backed by actual NEXRAD radar hail signatures — not estimates or ZIP-code averages.</p>
+                </div>
+
+                <div class="card-hover bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6">
+                    <div class="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-location-dot text-green-400"></i>
+                    </div>
+                    <h3 class="font-bold text-white mb-2">Actual property addresses</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Real streets, real house numbers from OpenStreetMap — no fabricated addresses that lead nowhere.</p>
+                </div>
+
+                @if (enrichmentEnabled)
+                {
+                    <div class="card-hover bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6">
+                        <div class="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-4">
+                            <i class="fa-solid fa-bolt text-brand"></i>
+                        </div>
+                        <h3 class="font-bold text-white mb-2">One-click owner lookup</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Pull owner name, phone, and email from public parcel records with a single click — no manual skip tracing.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="card-hover bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6">
+                        <div class="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-4">
+                            <i class="fa-solid fa-bell text-brand"></i>
+                        </div>
+                        <h3 class="font-bold text-white mb-2">Storm alerts, automatically</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Watch a neighborhood and get notified the moment hail or damaging wind hits it — no manual re-checking.</p>
+                    </div>
+                }
+
+                <div class="card-hover bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6">
+                    <div class="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-map text-violet-400"></i>
+                    </div>
+                    <h3 class="font-bold text-white mb-2">Interactive map view</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Every lead is pinned on a live map so you can plan a canvassing route or visualize storm damage concentration.</p>
+                </div>
+
+                <div class="card-hover bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6">
+                    <div class="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-file-csv text-orange-400"></i>
+                    </div>
+                    <h3 class="font-bold text-white mb-2">CSV export</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Export your lead list anytime — drop it straight into your CRM, dialers, or direct mail platform.</p>
+                </div>
+
+                <div class="card-hover bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6">
+                    <div class="w-10 h-10 rounded-xl bg-slate-600/40 border border-slate-600/40 flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-sliders text-slate-400"></i>
+                    </div>
+                    <h3 class="font-bold text-white mb-2">Filter &amp; sort by risk</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Sort by High / Medium / Low risk@(enrichmentEnabled ? ", search by owner name or address," : ", search by address,") and focus your time on the best opportunities first.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Pricing ────────────────────────────────────────────────────────── -->
+    <section id="pricing" class="py-24 px-6">
+        <div class="max-w-5xl mx-auto">
+            <div class="text-center mb-16">
+                <p class="text-brand font-semibold text-sm uppercase tracking-widest mb-3">Pricing</p>
+                <h2 class="text-3xl sm:text-4xl font-black">Start free. Pay for the reports you use.</h2>
+                <p class="text-slate-400 mt-3">No contracts. Cancel anytime. Every report is real radar and storm-spotter data — not a guess.</p>
+            </div>
+
+            <div class="grid sm:grid-cols-3 gap-6 items-start">
+
+                <!-- Free Trial -->
+                <div class="card-hover bg-slate-800/60 border border-slate-700/60 rounded-2xl p-7">
+                    <p class="text-sm font-semibold text-slate-400 mb-1">Free Trial</p>
+                    <div class="flex items-end gap-1 mb-1">
+                        <span class="text-4xl font-black text-white">$0</span>
+                        <span class="text-slate-500 mb-1.5">/ 14 days</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-4">No credit card required</p>
+                    <a href="/Auth/Register" class="block text-center bg-slate-700 hover:bg-slate-600 text-white font-semibold text-sm py-3 rounded-xl transition mb-7">
+                        Start Free Trial
+                    </a>
+                    <ul class="space-y-3 text-sm text-slate-300">
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>1 PDF hail report</li>
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Full access to Storm Explorer &amp; Neighborhood Scan</li>
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Real NOAA/NEXRAD hail data</li>
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Claim window countdown by state</li>
+                    </ul>
+                </div>
+
+                <!-- Starter -->
+                <div class="card-hover bg-slate-800/60 border border-slate-700/60 rounded-2xl p-7">
+                    <p class="text-sm font-semibold text-slate-400 mb-1">Starter</p>
+                    <div class="flex items-end gap-1 mb-1">
+                        <span class="text-4xl font-black text-white">$14.99</span>
+                        <span class="text-slate-500 mb-1.5">/month</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-4">10 PDF reports/mo &mdash; about $1.50 each</p>
+                    <a href="/Auth/Register" class="block text-center bg-slate-700 hover:bg-slate-600 text-white font-semibold text-sm py-3 rounded-xl transition mb-7">
+                        Get Started
+                    </a>
+                    <ul class="space-y-3 text-sm text-slate-300">
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>10 PDF hail reports every month</li>
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Full access to Storm Explorer &amp; Neighborhood Scan</li>
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Storm alerts for watched areas</li>
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>CSV export</li>
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Need more? Top up 3 reports for $5.99 anytime</li>
+                    </ul>
+                </div>
+
+                <!-- Pro -->
+                <div class="pricing-popular card-hover bg-slate-800/80 border-2 border-brand/50 rounded-2xl p-7 mt-4">
+                    <p class="text-sm font-semibold text-brand mb-1">Pro</p>
+                    <div class="flex items-end gap-1 mb-1">
+                        <span class="text-4xl font-black text-white">$39.99</span>
+                        <span class="text-slate-500 mb-1.5">/month</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-4">Unlimited PDF hail reports &mdash; no monthly cap</p>
+                    <a href="/Auth/Register" class="block text-center bg-brand hover:bg-orange-400 text-white font-bold text-sm py-3 rounded-xl transition mb-7 shadow-lg shadow-orange-500/20">
+                        Start Free Trial
+                    </a>
+                    <ul class="space-y-3 text-sm text-slate-300">
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Unlimited PDF hail reports</li>
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Everything in Starter</li>
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>No per-report math to worry about</li>
+                        <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Built for teams running high lead volume</li>
+                    </ul>
+                </div>
+
+            </div>
+
+            <!-- Pay-as-you-go: no subscription -->
+            <div class="mt-10 bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6 sm:p-8 text-center">
+                <p class="text-sm font-semibold text-white mb-1">Don't want a subscription?</p>
+                <p class="text-slate-400 text-sm mb-5">Buy hail reports in bulk, one time, no recurring commitment.</p>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-10">
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl font-black text-white">$59.99</span>
+                        <span class="text-slate-400 text-sm">for 50 reports <span class="text-slate-500">(~$1.20 each)</span></span>
+                    </div>
+                </div>
+                <a href="/Auth/Register" class="inline-block mt-6 text-brand hover:text-orange-400 text-sm font-semibold transition">
+                    Get started &rarr;
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Final CTA ──────────────────────────────────────────────────────── -->
+    <section class="py-24 px-6 border-t border-slate-800/60">
+        <div class="max-w-2xl mx-auto text-center">
+            <h2 class="text-3xl sm:text-4xl font-black mb-4">
+                Stop driving blind.<br />Start closing storm leads.
+            </h2>
+            <p class="text-slate-400 mb-8">Join roofing contractors already using real hail data to find their next job before the truck even leaves the lot.</p>
+            <a href="/Auth/Register"
+               class="inline-flex items-center gap-2 bg-brand hover:bg-orange-400 text-white font-bold text-base px-10 py-4 rounded-xl transition shadow-lg shadow-orange-500/20">
+                <i class="fa-solid fa-bolt"></i>
+                Get Started Free
+            </a>
+        </div>
+    </section>
+
+    <!-- ── Footer ────────────────────────────────────────────────────────── -->
+    <footer class="border-t border-slate-800/60 py-8 px-6">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded bg-brand flex items-center justify-center">
+                    <i class="fa-solid fa-cloud-bolt text-white text-xs"></i>
+                </div>
+                <span class="font-semibold text-slate-400">StormLead Pro</span>
+            </div>
+            <p>&copy; @DateTime.Now.Year StormLead Pro. All rights reserved.</p>
+            <div class="flex items-center gap-5">
+                <a href="#" class="hover:text-slate-300 transition">Privacy</a>
+                <a href="#" class="hover:text-slate-300 transition">Terms</a>
+                <a href="/Auth/Login" class="hover:text-slate-300 transition">Log in</a>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>

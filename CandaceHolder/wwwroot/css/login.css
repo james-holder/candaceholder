@@ -1,0 +1,41 @@
+/* ══════════════════════════════════════════════════════════════
+   StormLead Pro — Login page styles
+   Loaded only by Views/Auth/Login.cshtml
+══════════════════════════════════════════════════════════════ */
+
+.btn-provider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+    border: 1.5px solid rgba(255,255,255,0.1);
+    background: #1e293b;
+    color: #e2e8f0;
+    text-decoration: none;
+}
+.btn-provider:hover {
+    background: #263548;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.btn-provider img { width: 20px; height: 20px; flex-shrink: 0; }
+
+.divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #475569;
+    font-size: 12px;
+}
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #334155;
+}

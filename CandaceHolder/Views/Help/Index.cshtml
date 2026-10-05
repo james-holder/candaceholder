@@ -1,0 +1,604 @@
+@{
+    Layout = null;
+    var isAuthed = User.Identity?.IsAuthenticated == true;
+}
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@{
+    var enrichmentEnabled = Configuration.GetValue<bool>("FeatureFlags:EnrichmentEnabled");
+    var alertsEnabled     = Configuration.GetValue<bool>("FeatureFlags:AlertsEnabled");
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Help &amp; Documentation — StormLead Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/js/tailwind-config-help.js" asp-append-version="true"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <style>
+        html { scroll-behavior: smooth; }
+        .doc-section { scroll-margin-top: 80px; }
+        .faq-answer { display: none; }
+        .faq-answer.open { display: block; }
+    </style>
+</head>
+<body class="bg-slate-950 text-white font-sans antialiased">
+
+<!-- ── Nav ───────────────────────────────────────────────────────────────── -->
+<header class="sticky top-0 z-50 bg-slate-950/90 backdrop-blur border-b border-slate-800/60 shadow-lg">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+        <a href="@(isAuthed ? "/" : "/Home/Landing")" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center shadow">
+                <i class="fa-solid fa-house-chimney text-white text-sm"></i>
+            </div>
+            <span class="text-lg font-bold tracking-tight">Storm<span class="text-brand">Lead</span> Pro</span>
+        </a>
+
+        <nav class="hidden md:flex items-center gap-6 text-sm text-slate-400">
+            <a href="#getting-started"  class="hover:text-white transition-colors">Getting Started</a>
+            <a href="#features"         class="hover:text-white transition-colors">Features</a>
+            <a href="#data-sources"     class="hover:text-white transition-colors">Data Sources</a>
+            <a href="#faq"              class="hover:text-white transition-colors">FAQ</a>
+            <span class="text-slate-700">|</span>
+            @if (isAuthed)
+            {
+                <a href="/" class="px-3 py-1 rounded-full bg-brand/10 text-brand border border-brand/30 text-xs font-semibold hover:bg-brand/20 transition-colors">
+                    <i class="fa-solid fa-arrow-left mr-1"></i>Back to App
+                </a>
+            }
+            else
+            {
+                <a href="/Auth/Login" class="px-3 py-1 rounded-full bg-brand/10 text-brand border border-brand/30 text-xs font-semibold hover:bg-brand/20 transition-colors">
+                    <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i>Sign In
+                </a>
+            }
+        </nav>
+    </div>
+</header>
+
+<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+<section class="pt-20 pb-14 px-6 text-center border-b border-slate-800/60">
+    <div class="max-w-2xl mx-auto">
+        <div class="inline-flex items-center gap-2 bg-brand/10 border border-brand/20 rounded-full px-4 py-1.5 text-sm text-brand mb-6">
+            <i class="fa-solid fa-book-open text-xs"></i> Help &amp; Documentation
+        </div>
+        <h1 class="text-4xl sm:text-5xl font-black mb-4">Everything you need to know.</h1>
+        <p class="text-slate-400 text-lg">Learn how to find storm-damaged roofing leads, understand risk scores, explore hail events on the map, set up alerts, and get the most out of StormLead Pro.</p>
+    </div>
+</section>
+
+<!-- ── Layout: sidebar + content ─────────────────────────────────────────── -->
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14 flex gap-12">
+
+    <!-- Sidebar TOC (desktop) -->
+    <aside class="hidden lg:block w-56 shrink-0">
+        <nav class="sticky top-24 space-y-1 text-sm">
+            <p class="text-slate-500 font-semibold uppercase tracking-widest text-xs mb-3">On this page</p>
+            <a href="#getting-started"  class="block px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">Getting Started</a>
+            <a href="#searching"        class="block px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">Neighborhood Scan</a>
+            <a href="#storm-explorer"   class="block px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">Storm Explorer</a>
+            <a href="#risk-scores"      class="block px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">Risk Scores &amp; Hail</a>
+            <a href="#saved-leads"      class="block px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">Saved Leads</a>
+            @if (enrichmentEnabled)
+            {
+                <a href="#enrichment"       class="block px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">Owner Enrichment</a>
+            }
+            @if (alertsEnabled)
+            {
+                <a href="#alerts"           class="block px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">Storm Alerts</a>
+            }
+            <a href="#data-sources"     class="block px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">Data Sources</a>
+            <a href="#faq"              class="block px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">FAQ</a>
+        </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 min-w-0 space-y-16">
+
+        <!-- ── Getting Started ─────────────────────────────────────────── -->
+        <section id="getting-started" class="doc-section">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-9 h-9 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-rocket text-brand text-sm"></i>
+                </div>
+                <h2 class="text-2xl font-black">Getting Started</h2>
+            </div>
+            <div class="prose-custom space-y-4 text-slate-300 leading-relaxed">
+                <p>StormLead Pro helps roofing contractors find homeowners with storm-damaged roofs before the competition. It combines real NOAA radar hail data with actual property addresses to surface your highest-probability leads in seconds.</p>
+                <p>To get started, <a href="/Auth/Login" class="text-brand hover:underline">sign in</a> — no credit card required.</p>
+
+                <div class="grid sm:grid-cols-3 gap-4 mt-6">
+                    <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                        <div class="text-brand font-black text-xl mb-2">1</div>
+                        <h3 class="font-bold text-white mb-1">Search a neighborhood</h3>
+                        <p class="text-slate-400 text-sm">Enter any address and pick a radius. We pull every nearby property and check it against hail records.</p>
+                    </div>
+                    <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                        <div class="text-brand font-black text-xl mb-2">2</div>
+                        <h3 class="font-bold text-white mb-1">Review risk scores</h3>
+                        <p class="text-slate-400 text-sm">Each property gets a High / Medium / Low risk rating based on real hail size and recency.</p>
+                    </div>
+                    <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                        <div class="text-brand font-black text-xl mb-2">3</div>
+                        <h3 class="font-bold text-white mb-1">Save &amp; download</h3>
+                        <p class="text-slate-400 text-sm">Save your best leads, then download a branded PDF hail report for each one to bring to the door.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Neighborhood Scan ───────────────────────────────────────── -->
+        <section id="searching" class="doc-section">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-magnifying-glass text-sky-400 text-sm"></i>
+                </div>
+                <h2 class="text-2xl font-black">Neighborhood Scan</h2>
+            </div>
+            <div class="space-y-4 text-slate-300 leading-relaxed">
+                <p>From the <strong class="text-white">Neighborhood Scan</strong> tab, enter any address — a street address, intersection, city, or ZIP code — and choose a search radius (0.25 to 3 miles). Hit <span class="inline-flex items-center gap-1 bg-brand/10 border border-brand/20 text-brand text-xs px-2 py-0.5 rounded font-semibold">Scan Neighborhood</span> and results appear within seconds.</p>
+
+                <h3 class="text-white font-bold text-lg mt-6">Reading the results</h3>
+                <p>Each property card shows the address, a color-coded risk badge, the largest recorded hail size, the most recent storm date, and the number of storm events on record. Properties are sorted highest-risk first by default.</p>
+
+                <h3 class="text-white font-bold text-lg mt-6">Map view</h3>
+                <p>The interactive map shows every result as a circle, color-coded by risk level — red for High, orange for Medium, yellow for Low — so you can immediately see where storm damage is concentrated. Click any circle to highlight the matching property card. Switch to Satellite view using the layer control in the top-right corner of the map.</p>
+
+                <h3 class="text-white font-bold text-lg mt-6">Saving leads</h3>
+                <p>Click the bookmark icon on any property card to save it to your lead list. You can save individual leads or use <strong class="text-white">Select All</strong> and then <strong class="text-white">Save Selected</strong> to bulk-save multiple properties at once.</p>
+            </div>
+        </section>
+
+        <!-- ── Storm Explorer ──────────────────────────────────────────── -->
+        <section id="storm-explorer" class="doc-section">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-9 h-9 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-cloud-bolt text-brand text-sm"></i>
+                </div>
+                <h2 class="text-2xl font-black">
+                    Storm Explorer
+                    <span class="ml-2 text-xs font-bold bg-brand/20 text-brand border border-brand/30 px-2 py-0.5 rounded-full align-middle">BETA</span>
+                </h2>
+            </div>
+            <div class="space-y-4 text-slate-300 leading-relaxed">
+                <p>Storm Explorer flips the workflow. Instead of searching a specific address, you pan and zoom a full-screen map to explore storm history across any region. As you move the map, the left panel automatically updates with ranked storm clusters in the visible area.</p>
+                <p>Click the <strong class="text-white">Storm Explorer</strong> tab at the top of the app to switch into this mode.</p>
+
+                <h3 class="text-white font-bold text-lg mt-6">Filter bar</h3>
+                <p>Four controls let you narrow what you see:</p>
+                <div class="grid sm:grid-cols-2 gap-3 mt-3">
+                    <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4">
+                        <p class="font-semibold text-white text-sm mb-1"><i class="fa-solid fa-snowflake text-sky-400 mr-1.5"></i>Min Hail</p>
+                        <p class="text-slate-400 text-sm">Show only clusters that had hail at or above this size. Range: 0.50" (pea) through 2.00" (golf ball).</p>
+                    </div>
+                    <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4">
+                        <p class="font-semibold text-white text-sm mb-1"><i class="fa-solid fa-calendar text-violet-400 mr-1.5"></i>Period</p>
+                        <p class="text-slate-400 text-sm">Lookback window for storm events: 30, 60, 90 days (default), 6 months, or 12 months.</p>
+                    </div>
+                    <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4">
+                        <p class="font-semibold text-white text-sm mb-1"><i class="fa-solid fa-wind text-blue-400 mr-1.5"></i>Wind Events</p>
+                        <p class="text-slate-400 text-sm">Toggle to include or exclude high-wind reports alongside hail events.</p>
+                    </div>
+                    <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4">
+                        <p class="font-semibold text-white text-sm mb-1"><i class="fa-solid fa-circle-dot text-sky-400 mr-1.5"></i>Hail Reports</p>
+                        <p class="text-slate-400 text-sm">Overlay individual NWS spotter and SPC hail event dots on the map. See below for details.</p>
+                    </div>
+                </div>
+
+                <h3 class="text-white font-bold text-lg mt-6">Event list</h3>
+                <p>The left panel shows ranked storm clusters — groups of hail/wind reports near the same location. Each card shows the tier (HOT / ACTIVE / MINOR), the largest hail size, peak wind speed, date, and a score from 0–100. Click any card to fly the map to that cluster.</p>
+                <div class="grid sm:grid-cols-3 gap-3 mt-3">
+                    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                        <span class="text-xs font-bold bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full">HOT</span>
+                        <p class="text-slate-400 text-sm mt-2">Score ≥ 70. Significant hail — roof damage likely. Act fast.</p>
+                    </div>
+                    <div class="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
+                        <span class="text-xs font-bold bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full">ACTIVE</span>
+                        <p class="text-slate-400 text-sm mt-2">Score 40–69. Moderate event. Worth canvassing nearby.</p>
+                    </div>
+                    <div class="bg-slate-700/30 border border-slate-600/40 rounded-xl p-4">
+                        <span class="text-xs font-bold bg-slate-600/30 text-slate-400 px-2 py-0.5 rounded-full">MINOR</span>
+                        <p class="text-slate-400 text-sm mt-2">Score &lt; 40. Small or older event. Low priority.</p>
+                    </div>
+                </div>
+
+                <h3 class="text-white font-bold text-lg mt-6">Hail Reports overlay</h3>
+                <p>Toggling <strong class="text-white">Hail Reports</strong> on loads individual hail event dots sourced from NWS storm spotters and the NOAA Storm Prediction Center (SPC). These are raw, un-aggregated reports — one dot per storm-spotter observation — giving you a finer-grained picture than the cluster circles alone.</p>
+                <p>A floating legend appears in the lower-left corner of the map when the overlay is active:</p>
+                <div class="flex flex-col gap-2 mt-3 max-w-xs">
+                    <div class="flex items-center gap-3 bg-slate-800/60 border border-slate-700/60 rounded-lg px-4 py-2.5">
+                        <span class="w-4 h-4 rounded-full bg-red-500/60 border border-red-500 shrink-0"></span>
+                        <span class="text-sm"><span class="text-red-400 font-semibold">≥ 2.0"</span> <span class="text-slate-500 text-xs ml-1">golf ball</span></span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-slate-800/60 border border-slate-700/60 rounded-lg px-4 py-2.5">
+                        <span class="w-3.5 h-3.5 rounded-full bg-orange-500/60 border border-orange-500 shrink-0"></span>
+                        <span class="text-sm"><span class="text-orange-400 font-semibold">≥ 1.0"</span> <span class="text-slate-500 text-xs ml-1">quarter</span></span>
+                    </div>
+                    <div class="flex items-center gap-3 bg-slate-800/60 border border-slate-700/60 rounded-lg px-4 py-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-yellow-500/60 border border-yellow-500 shrink-0"></span>
+                        <span class="text-sm"><span class="text-yellow-400 font-semibold">&lt; 1.0"</span> <span class="text-slate-500 text-xs ml-1">pea / dime</span></span>
+                    </div>
+                </div>
+                <p class="mt-3">Dot size scales with hail diameter so larger events are immediately visible. Hover any dot for the exact size, date, and report source.</p>
+
+                <h3 class="text-white font-bold text-lg mt-6">Map layers</h3>
+                <p>Use the layer control (top-right of map) to switch between <strong class="text-white">Dark Street</strong> (default) and <strong class="text-white">Satellite</strong> base maps. The Esri World Imagery satellite layer makes it easy to visually assess roof condition and neighborhood density before running a full Neighborhood Scan.</p>
+            </div>
+        </section>
+
+        <!-- ── Risk Scores ─────────────────────────────────────────────── -->
+        <section id="risk-scores" class="doc-section">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation text-red-400 text-sm"></i>
+                </div>
+                <h2 class="text-2xl font-black">Risk Scores &amp; Hail Sizes</h2>
+            </div>
+            <div class="space-y-4 text-slate-300 leading-relaxed">
+                <p>Risk scores are calculated from three factors: the largest hail size on record for that property's location, how recently the storm occurred, and the number of separate hail events. Larger, more recent hail = higher score.</p>
+
+                <div class="grid sm:grid-cols-3 gap-4 mt-2">
+                    <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                        <span class="inline-block bg-red-500/20 text-red-400 text-xs font-bold px-2 py-0.5 rounded mb-2">HIGH</span>
+                        <p class="text-slate-300 text-sm">Hail ≥ 1.0" recorded within the past year. Roof damage is likely — these leads are your best opportunity.</p>
+                    </div>
+                    <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+                        <span class="inline-block bg-yellow-500/20 text-yellow-400 text-xs font-bold px-2 py-0.5 rounded mb-2">MEDIUM</span>
+                        <p class="text-slate-300 text-sm">Smaller hail or older events. Worth a call — some damage may not have been repaired yet.</p>
+                    </div>
+                    <div class="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                        <span class="inline-block bg-green-500/20 text-green-400 text-xs font-bold px-2 py-0.5 rounded mb-2">LOW</span>
+                        <p class="text-slate-300 text-sm">Minimal or marginal hail on record. Lower priority, but still in your search area.</p>
+                    </div>
+                </div>
+
+                <h3 class="text-white font-bold text-lg mt-6">NWS Hail Size Reference</h3>
+                <p>Hail sizes follow the National Weather Service coin comparison scale:</p>
+
+                <div class="grid sm:grid-cols-2 gap-2 mt-3 text-sm">
+                    @{
+                        var hailSizes = new[] {
+                            ("🟡", "Pea",          "0.25\""),
+                            ("🔵", "Marble",       "0.50\""),
+                            ("🪙", "Penny",        "0.75\""),
+                            ("🪙", "Nickel",       "0.88\""),
+                            ("🪙", "Quarter",      "1.00\""),
+                            ("🪙", "Half Dollar",  "1.25\""),
+                            ("🏓", "Ping Pong",    "1.50\""),
+                            ("⛳", "Golf Ball",    "1.75\""),
+                            ("🥚", "Hen Egg",      "2.00\""),
+                            ("🎾", "Tennis Ball",  "2.50\""),
+                            ("⚾", "Baseball",     "2.75\""),
+                            ("🥎", "Softball",     "4.00\"+"),
+                        };
+                    }
+                    @foreach (var (icon, name, size) in hailSizes)
+                    {
+                        <div class="flex items-center justify-between bg-slate-800/50 border border-slate-700/40 rounded-lg px-3 py-2">
+                            <span>@icon <span class="text-white font-medium ml-1">@name</span></span>
+                            <span class="text-slate-400 font-mono text-xs">@size</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Saved Leads ─────────────────────────────────────────────── -->
+        <section id="saved-leads" class="doc-section">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-bookmark text-violet-400 text-sm"></i>
+                </div>
+                <h2 class="text-2xl font-black">Saved Leads</h2>
+            </div>
+            <div class="space-y-4 text-slate-300 leading-relaxed">
+                <p>The <strong class="text-white">Saved Leads</strong> page is your working lead list. Every property you save from a search lands here. You can filter by risk level, search by address or owner name, and track each lead through your sales pipeline.</p>
+
+                <h3 class="text-white font-bold text-lg mt-6">Lead statuses</h3>
+                <p>Move leads through your pipeline by setting their status:</p>
+                <div class="space-y-2 mt-3">
+                    @{
+                        var statuses = new[] {
+                            ("New",       "slate",  "Just saved — not yet contacted."),
+                            ("Contacted", "blue",   "You've reached out by phone or email."),
+                            ("Quoted",    "yellow", "An estimate has been provided."),
+                            ("Closed",    "green",  "Job won — roof replacement scheduled or complete."),
+                            ("Dead",      "red",    "Not interested, unresponsive, or already repaired."),
+                        };
+                    }
+                    @foreach (var (label, color, desc) in statuses)
+                    {
+                        <div class="flex items-start gap-3 bg-slate-800/50 border border-slate-700/40 rounded-lg px-4 py-3">
+                            <span class="text-xs font-bold bg-@(color)-500/20 text-@(color)-400 border border-@(color)-500/30 px-2 py-0.5 rounded mt-0.5 shrink-0">@label.ToUpper()</span>
+                            <span class="text-slate-400 text-sm">@desc</span>
+                        </div>
+                    }
+                </div>
+
+                <h3 class="text-white font-bold text-lg mt-6">Notes</h3>
+                <p>Each lead has a notes field. Click the notes icon on any row to add call logs, observations, or follow-up reminders. Notes auto-save.</p>
+
+                <h3 class="text-white font-bold text-lg mt-6">CSV Export</h3>
+                <p>Click <span class="text-slate-200 font-semibold">Export CSV</span> at the top of the Saved Leads page to download your full lead list. The export includes address, owner name, phone, email, risk level, hail size, and current status — ready to drop into any CRM or dialer.</p>
+            </div>
+        </section>
+
+        @if (enrichmentEnabled)
+        {
+            <!-- ── Enrichment ──────────────────────────────────────────────── -->
+            <section id="enrichment" class="doc-section">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-bolt text-brand text-sm"></i>
+                    </div>
+                    <h2 class="text-2xl font-black">Owner Enrichment</h2>
+                </div>
+                <div class="space-y-4 text-slate-300 leading-relaxed">
+                    <p>Enrichment pulls the property owner's name, phone number, and email address from public parcel records and data providers — so you can start outreach without manual skip tracing.</p>
+
+                    <p>To enrich a lead, click the <i class="fa-solid fa-bolt text-brand text-xs"></i> lightning bolt icon on any row in Saved Leads. The enrichment runs in the background and fills in the owner's contact details within a few seconds.</p>
+
+                    <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 mt-4">
+                        <p class="text-white font-semibold mb-2"><i class="fa-solid fa-circle-info text-sky-400 mr-2"></i>Data providers used</p>
+                        <ul class="text-slate-400 text-sm space-y-1">
+                            <li><span class="text-slate-200">Regrid</span> — public parcel data for owner name and property details (free tier: 25/day)</li>
+                            <li><span class="text-slate-200">Whitepages Pro</span> — phone and email lookup (~$0.22/record)</li>
+                        </ul>
+                    </div>
+
+                    <p class="text-slate-500 text-sm mt-2"><i class="fa-solid fa-shield-halved mr-1"></i>Enrichment data comes from public records. Availability varies by county and state.</p>
+                </div>
+            </section>
+        }
+
+        @if (alertsEnabled)
+        {
+            <!-- ── Storm Alerts ────────────────────────────────────────────── -->
+            <section id="alerts" class="doc-section">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-bell text-sky-400 text-sm"></i>
+                    </div>
+                    <h2 class="text-2xl font-black">Storm Alerts</h2>
+                </div>
+                <div class="space-y-4 text-slate-300 leading-relaxed">
+                    <p>Storm Alerts watch your territory for you. Instead of checking back every day, you define the areas you work and StormLead Pro emails you the moment qualifying hail is detected — so you can be the first roofer on the phone after a storm.</p>
+
+                    <h3 class="text-white font-bold text-lg mt-6">Setting up a watched area</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-slate-300 text-sm mt-2">
+                        <li>Go to <a href="/Alerts" class="text-brand hover:underline">Alerts</a> in the navigation.</li>
+                        <li>Enter an address or city name in the <span class="text-slate-200 font-semibold">Add Watch Area</span> form.</li>
+                        <li>Choose a radius (5, 10, 25, or 50 miles).</li>
+                        <li>Set your minimum hail size threshold — alerts only fire when hail meets or exceeds this size.</li>
+                        <li>Click <span class="text-slate-200 font-semibold">Add Watch Area</span>. You can add multiple areas to cover your full territory.</li>
+                    </ol>
+
+                    <h3 class="text-white font-bold text-lg mt-6">How alerts work</h3>
+                    <p>StormLead Pro checks for new hail events every 30 minutes using Tomorrow.io weather data. When a hail event meets your radius and minimum size criteria, you receive an email with the storm details and a direct link to search that neighborhood for leads. Each unique storm event triggers at most one alert per watched area — no duplicate emails.</p>
+
+                    <h3 class="text-white font-bold text-lg mt-6">Email setup</h3>
+                    <p>Alerts are delivered via your own SMTP server. Contact your administrator to configure the outbound email settings. Once configured, alert emails arrive from your own domain — which also improves deliverability.</p>
+
+                    <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 mt-2">
+                        <p class="text-slate-400 text-sm"><i class="fa-solid fa-toggle-on text-green-400 mr-2"></i>You can pause or reactivate any watched area at any time using the toggle on the Alerts page. Paused areas will not trigger emails but remain saved for when you need them.</p>
+                    </div>
+                </div>
+            </section>
+        }
+
+        <!-- ── Data Sources ────────────────────────────────────────────── -->
+        <section id="data-sources" class="doc-section">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-9 h-9 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-database text-green-400 text-sm"></i>
+                </div>
+                <h2 class="text-2xl font-black">Data Sources</h2>
+            </div>
+            <div class="space-y-3 text-slate-300">
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-cloud-showers-heavy text-sky-400 mt-0.5 w-4 shrink-0"></i>
+                        <div>
+                            <p class="font-semibold text-white">NOAA SWDI <span class="text-xs text-slate-500 font-normal ml-1">— Hail history (Neighborhood Scan)</span></p>
+                            <p class="text-slate-400 text-sm mt-1">The National Weather Service Severe Weather Data Inventory contains verified NEXRAD radar hail signatures going back 10+ years. No API key required — completely free and publicly available. Note: SWDI data carries a ~90–120 day processing lag for the most recent events.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-circle-dot text-sky-400 mt-0.5 w-4 shrink-0"></i>
+                        <div>
+                            <p class="font-semibold text-white">Iowa State Mesonet LSR <span class="text-xs text-slate-500 font-normal ml-1">— Hail Reports overlay</span></p>
+                            <p class="text-slate-400 text-sm mt-1">The Iowa State IEM Local Storm Reports API provides NWS storm-spotter hail observations for the US with up to 5 years of history. Used to power the individual Hail Reports dots in Storm Explorer. Free, no API key required.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-bolt text-yellow-400 mt-0.5 w-4 shrink-0"></i>
+                        <div>
+                            <p class="font-semibold text-white">NOAA SPC Hail Reports <span class="text-xs text-slate-500 font-normal ml-1">— Hail Reports overlay (recent)</span></p>
+                            <p class="text-slate-400 text-sm mt-1">The Storm Prediction Center publishes verified hail reports from the past several days as a public CSV feed. StormLead Pro merges SPC reports with LSR data, deduplicates overlapping events, and renders them as the Hail Reports overlay in Storm Explorer. Free, no API key required.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-satellite text-violet-400 mt-0.5 w-4 shrink-0"></i>
+                        <div>
+                            <p class="font-semibold text-white">Tomorrow.io <span class="text-xs text-slate-500 font-normal ml-1">— Storm Alerts &amp; recent hail</span></p>
+                            <p class="text-slate-400 text-sm mt-1">Powers the Storm Alerts background monitor with near-real-time storm data and fills the NOAA processing gap for very recent events in Neighborhood Scan. Free tier covers 500 requests/day.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-map-location-dot text-green-400 mt-0.5 w-4 shrink-0"></i>
+                        <div>
+                            <p class="font-semibold text-white">OpenStreetMap / Overpass API <span class="text-xs text-slate-500 font-normal ml-1">— Property addresses</span></p>
+                            <p class="text-slate-400 text-sm mt-1">Real residential addresses pulled from the OpenStreetMap Overpass API. Covers the entire US with no API key or usage fees. Address density varies by region.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-file-lines text-orange-400 mt-0.5 w-4 shrink-0"></i>
+                        <div>
+                            <p class="font-semibold text-white">Regrid <span class="text-xs text-slate-500 font-normal ml-1">— Parcel &amp; owner data</span></p>
+                            <p class="text-slate-400 text-sm mt-1">Public parcel records including owner name, property type, and year built. Free Starter plan includes 25 lookups/day.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-address-card text-pink-400 mt-0.5 w-4 shrink-0"></i>
+                        <div>
+                            <p class="font-semibold text-white">Whitepages Pro <span class="text-xs text-slate-500 font-normal ml-1">— Phone &amp; email lookup</span></p>
+                            <p class="text-slate-400 text-sm mt-1">Appends phone numbers and email addresses to enriched leads. Pay-per-record (~$0.22/lookup). @(enrichmentEnabled ? "Only called when you click the enrich button on a lead." : "Currently disabled — not called anywhere in the app.")</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-map text-brand mt-0.5 w-4 shrink-0"></i>
+                        <div>
+                            <p class="font-semibold text-white">Google Maps <span class="text-xs text-slate-500 font-normal ml-1">— Geocoding &amp; map display</span></p>
+                            <p class="text-slate-400 text-sm mt-1">Used for address autocomplete, geocoding (address → lat/lng), and the interactive map view in Neighborhood Scan.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-globe text-teal-400 mt-0.5 w-4 shrink-0"></i>
+                        <div>
+                            <p class="font-semibold text-white">Esri World Imagery / Leaflet.js <span class="text-xs text-slate-500 font-normal ml-1">— Storm Explorer map</span></p>
+                            <p class="text-slate-400 text-sm mt-1">The Storm Explorer map is built on Leaflet.js with Esri World Imagery satellite tiles and CARTO dark street tiles. Free for non-commercial use.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── FAQ ────────────────────────────────────────────────────── -->
+        <section id="faq" class="doc-section">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-9 h-9 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-circle-question text-brand text-sm"></i>
+                </div>
+                <h2 class="text-2xl font-black">Frequently Asked Questions</h2>
+            </div>
+
+            <div class="space-y-2" id="faqList">
+
+                @{
+                    var faqs = new[] {
+                        ("Is the hail data real, or are the risk scores estimated?",
+                         "All hail data comes from NOAA's NEXRAD radar network, NWS storm spotters, and Tomorrow.io — no estimates, no ZIP-code averages. Every risk score is based on an actual recorded hail event at or near that property's coordinates."),
+
+                        ("How fresh is the data?",
+                         "NOAA SWDI data (used for Neighborhood Scan) carries a ~90–120 day processing lag. For recent storms, StormLead Pro supplements NOAA with Tomorrow.io, which is updated within hours of a storm. The Storm Explorer Hail Reports overlay draws from Iowa State LSR (up to 5-year history) and the SPC feed (last few days), so it reflects events that haven't yet landed in SWDI. Storm Alerts use Tomorrow.io exclusively and fire within 30 minutes of detection."),
+
+                        ("What is Storm Explorer and how is it different from Neighborhood Scan?",
+                         "Neighborhood Scan is address-first: you enter a specific address and we find every property nearby that was hit by hail. Storm Explorer is map-first: you pan and zoom freely to explore storm history across any region and see ranked event clusters. Use Storm Explorer to scout unfamiliar territory or find active storm corridors, then drill into a neighborhood with Neighborhood Scan to pull the actual lead list."),
+
+                        ("What do the Hail Reports dots in Storm Explorer represent?",
+                         "Each dot is an individual storm-spotter observation from the NWS Local Storm Reports network or the NOAA SPC hail feed. These are ground-truth human reports — a trained spotter found and measured an actual hailstone. Dot color and size reflect hail diameter: red/large for golf ball and above, orange/medium for quarter-size, yellow/small for pea to dime. Hover any dot for the exact size, date, and report source."),
+
+                        ("What if an address doesn't appear in the results?",
+                         "Address coverage depends on OpenStreetMap data density in that area. Rural or recently developed neighborhoods may have fewer addresses on record. You can always enter a specific address directly in the search bar even if it doesn't appear in the results list."),
+
+                        ("Can I export my leads to my CRM?",
+                         "Yes. Click Export CSV on the Saved Leads page to download your full lead list. The CSV includes address, owner name, phone, email, risk level, hail size, year built, status, and notes — compatible with any CRM or dialer that accepts CSV import."),
+
+                        ("What does StormLead Pro cost?",
+                         "Every account starts with a 14-day free trial that includes 1 PDF report. After that, Starter is $14.99/mo for 10 reports and Pro is $39.99/mo for unlimited reports — no monthly cap. If you'd rather not subscribe, a one-time report pack is also available: 50 reports for $59.99, no recurring commitment."),
+
+                        ("What happens when I run out of reports on my plan?",
+                         "You can buy a quick top-up — 3 additional reports for $5.99 — or upgrade to Pro for unlimited reports. Top-ups are available any time your monthly allotment runs out."),
+
+                        ("Do I need a subscription to buy hail reports?",
+                         "No. The 50-report pack ($59.99) is a one-time purchase with no subscription required — a good fit if you only need reports occasionally rather than every month."),
+
+                        ("How does owner enrichment work?",
+                         "When you click the enrich button on a lead, StormLead Pro queries Regrid for the public parcel record (owner name, year built, property type) and then Whitepages Pro for a phone number and email address. Results appear within a few seconds. Enrichment quality depends on public record availability in that county."),
+
+                        ("Will storm alerts work even if I have no saved leads in the area?",
+                         "Yes — and that's the point. Watched areas are territory-based, not lead-based. An alert fires the moment hail hits your watched area, even if you have zero leads there yet. It's designed to get you into a new neighborhood before you've ever worked it."),
+
+                        ("How many watched areas can I have?",
+                         "Currently unlimited. You can add as many areas as you need to cover your full territory."),
+
+                        ("Is my data private?",
+                         "Yes. Your saved leads, notes, and watched areas are tied to your account and are never visible to other users."),
+
+                        ("What SMTP server do I need for email alerts?",
+                         "Any standard SMTP server works — Gmail, Outlook, or a private mail server. StormLead Pro uses STARTTLS on port 587 by default. Contact your administrator to configure the outbound email settings in the app."),
+                    };
+                }
+
+                @{
+                    var alertFaqQuestions = new[]
+                    {
+                        "Will storm alerts work even if I have no saved leads in the area?",
+                        "How many watched areas can I have?",
+                        "What SMTP server do I need for email alerts?"
+                    };
+                }
+                @foreach (var (q, a) in faqs.Where(f =>
+                    (enrichmentEnabled || f.Item1 != "How does owner enrichment work?") &&
+                    (alertsEnabled     || !alertFaqQuestions.Contains(f.Item1))))
+                {
+                    <div class="faq-item border border-slate-700/60 rounded-xl overflow-hidden">
+                        <button onclick="toggleFaq(this)"
+                                class="w-full flex items-center justify-between px-5 py-4 text-left text-white font-semibold hover:bg-slate-800/60 transition-colors">
+                            <span>@q</span>
+                            <i class="fa-solid fa-chevron-down text-slate-500 text-xs ml-4 shrink-0 transition-transform duration-200"></i>
+                        </button>
+                        <div class="faq-answer px-5 pb-4 text-slate-400 text-sm leading-relaxed border-t border-slate-700/60">
+                            <div class="pt-4">@a</div>
+                        </div>
+                    </div>
+                }
+
+            </div>
+        </section>
+
+        <!-- ── Still need help? ────────────────────────────────────────── -->
+        <section class="doc-section bg-slate-800/40 border border-slate-700/60 rounded-2xl p-8 text-center">
+            <i class="fa-solid fa-envelope text-brand text-2xl mb-4"></i>
+            <h2 class="text-xl font-bold mb-2">Still have questions?</h2>
+            <p class="text-slate-400 mb-4">Can't find what you're looking for? Reach out and we'll get back to you.</p>
+            <a href="mailto:support@stormlead.pro"
+               class="inline-flex items-center gap-2 bg-brand hover:bg-orange-400 text-white font-semibold px-6 py-3 rounded-xl transition text-sm">
+                <i class="fa-solid fa-envelope text-xs"></i>
+                Contact Support
+            </a>
+        </section>
+
+    </main>
+</div>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+<footer class="border-t border-slate-800/60 py-8 px-6 mt-8">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
+        <div class="flex items-center gap-2">
+            <div class="w-6 h-6 rounded bg-brand flex items-center justify-center">
+                <i class="fa-solid fa-cloud-bolt text-white text-xs"></i>
+            </div>
+            <span class="font-semibold text-slate-400">StormLead Pro</span>
+        </div>
+        <p>&copy; @DateTime.Now.Year StormLead Pro. All rights reserved.</p>
+        <div class="flex items-center gap-5">
+            <a href="/Home/Landing" class="hover:text-slate-300 transition">Home</a>
+            <a href="/Auth/Login"   class="hover:text-slate-300 transition">Sign In</a>
+        </div>
+    </div>
+</footer>
+
+<script src="~/js/help-index.js" asp-append-version="true"></script>
+
+</body>
+</html>

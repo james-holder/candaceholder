@@ -1,0 +1,30 @@
+﻿################################################################################
+# .gitignore — StormLead Pro
+################################################################################
+
+# Build output
+/CandaceHolder/bin/
+/CandaceHolder/obj/
+
+# Visual Studio
+.vs/
+/CandaceHolder/.vs/
+*.user
+
+# Secrets / local config (never commit real keys)
+/CandaceHolder/appsettings.Development.json
+
+# Runtime data (SQLite DB, auth keys, uploaded logos, MESH cache) — moved out
+# of bin/Debug and out of Data/ (case-collision with the C# source folder on
+# Windows) into App_Data/ at the project root. Never commit any of it.
+/CandaceHolder/App_Data/
+
+# Claude internal
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+/CandaceHolder/TODO.md
+/CandaceHolder/docs
+*.har

@@ -1,0 +1,531 @@
+@{
+    Layout = null;
+    var alertsEnabled = Configuration.GetValue<bool>("FeatureFlags:AlertsEnabled");
+}
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Saved Leads — StormLead Pro</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/saved-leads.css" />
+</head>
+<body class="min-h-screen">
+
+<!-- Toast -->
+<div id="toast">
+    <i id="toastIcon" class="fa-solid fa-circle-check"></i>
+    <span id="toastMsg"></span>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════════════════════ -->
+<header class="sticky top-0 z-50 bg-[#0f172a] border-b border-slate-700/60 shadow-lg relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+
+        <a href="/" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center shadow">
+                <i class="fa-solid fa-house-chimney text-white text-sm"></i>
+            </div>
+            <span class="text-lg font-bold tracking-tight">
+                Storm<span class="text-brand">Lead</span> Pro
+            </span>
+        </a>
+
+        <nav class="hidden lg:flex items-center gap-6 text-sm text-slate-400">
+            <a href="/" class="hover:text-white transition-colors">
+                <i class="fa-solid fa-magnifying-glass mr-1 text-xs"></i>Search
+            </a>
+            <a href="/Leads/Saved" class="text-white font-semibold">
+                <i class="fa-solid fa-bookmark mr-1 text-brand text-xs"></i>Saved Leads
+            </a>
+            <a href="/Dashboard" class="hover:text-white transition-colors">Dashboard</a>
+            @if (alertsEnabled)
+            {
+                <a href="/Alerts" class="hover:text-white transition-colors">
+                    <i class="fa-solid fa-bell mr-1 text-xs"></i>Alerts
+                </a>
+            }
+            <a href="/Help" class="hover:text-white transition-colors">
+                <i class="fa-solid fa-circle-question mr-1 text-xs"></i>Help
+            </a>
+            @if (User.FindFirst("admin_role")?.Value is "admin" or "super_admin" ||
+                 string.Equals(User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "", Configuration["AdminEmail"], System.StringComparison.OrdinalIgnoreCase)) {
+                <a href="/Admin" class="text-orange-400 hover:text-orange-300 transition-colors text-xs">
+                    <i class="fa-solid fa-shield-halved mr-1"></i>Admin
+                </a>
+            }
+            <span class="text-slate-600">|</span>
+            @await Html.PartialAsync("_AccountMenu")
+        </nav>
+
+        <!-- Hamburger (mobile only) -->
+        <button id="mobileMenuBtn" onclick="toggleMobileMenu()"
+            class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors">
+            <i id="mobileMenuIcon" class="fa-solid fa-bars text-lg"></i>
+        </button>
+    </div>
+
+    <!-- Mobile nav drawer -->
+    <div id="mobileMenu" class="hidden lg:hidden absolute top-full left-0 right-0 bg-[#0f172a] border-t border-slate-700/60 shadow-2xl z-50 px-4 py-3 flex flex-col gap-1">
+        <a href="/" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-magnifying-glass w-4 text-center text-xs"></i>Search
+        </a>
+        <a href="/Leads/Saved" class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-700/60 text-white font-semibold text-sm">
+            <i class="fa-solid fa-bookmark text-brand w-4 text-center text-xs"></i>Saved Leads
+        </a>
+        <a href="/Dashboard" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-chart-bar w-4 text-center text-xs"></i>Dashboard
+        </a>
+        @if (alertsEnabled)
+        {
+            <a href="/Alerts" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+                <i class="fa-solid fa-bell w-4 text-center text-xs"></i>Alerts
+            </a>
+        }
+        <a href="/Help" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-circle-question w-4 text-center text-xs"></i>Help
+        </a>
+        <div class="border-t border-slate-700/60 my-1"></div>
+        @await Html.PartialAsync("_AccountMenuMobile")
+    </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════
+     PAGE HERO
+══════════════════════════════════════════════════════════════ -->
+<div class="border-b border-slate-700/40 bg-gradient-to-r from-slate-900 to-[#0f172a]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-extrabold text-white flex items-center gap-2">
+                <i class="fa-solid fa-bookmark text-brand"></i>
+                Saved Leads
+                <span id="heroCount" class="text-base font-normal text-slate-400 ml-1"></span>
+            </h1>
+            <p class="text-slate-400 text-sm mt-0.5">Manage your saved leads and download hail reports.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="exportCSV()"
+                class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600
+                       border border-slate-600 text-xs font-semibold text-slate-200 transition shadow">
+                <i class="fa-solid fa-file-csv text-brand"></i>Export CSV
+            </button>
+            <a href="/"
+                class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-brand-dark
+                       text-white text-xs font-semibold transition shadow">
+                <i class="fa-solid fa-plus"></i>New Scan
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     LEAD TABS  (Needs Enrichment / Enriched)
+══════════════════════════════════════════════════════════════ -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 pb-1 overflow-x-auto">
+    <div class="inline-flex min-w-full sm:min-w-0 rounded-xl bg-slate-800 border border-slate-700 p-1 gap-1">
+        <button id="tabPipeline" onclick="switchLeadTab('pipeline')"
+            class="lead-tab lead-tab-active flex-1 flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap">
+            <i class="fa-solid fa-filter text-sky-400"></i>
+            Pipeline
+            <span id="tabPipelineCount" class="px-2 py-0.5 rounded-full bg-slate-700/80 text-xs font-bold text-slate-300"></span>
+        </button>
+        <button id="tabClosed" onclick="switchLeadTab('closed')"
+            class="lead-tab flex-1 flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap">
+            <i class="fa-solid fa-flag-checkered text-slate-400"></i>
+            Closed
+            <span id="tabClosedCount" class="px-2 py-0.5 rounded-full bg-slate-700/80 text-xs font-bold text-slate-300"></span>
+        </button>
+        <button id="tabArchived" onclick="switchLeadTab('archived')"
+            class="lead-tab flex-1 flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap">
+            <i class="fa-solid fa-box-archive text-slate-400"></i>
+            <span class="hidden sm:inline">Archived</span>
+            <span class="sm:hidden">Archive</span>
+            <span id="tabArchivedCount" class="px-2 py-0.5 rounded-full bg-slate-700/80 text-xs font-bold text-slate-300"></span>
+        </button>
+    </div>
+</div>
+
+<!-- Bulk action toolbar (appears when rows selected) -->
+<div id="bulkToolbar" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+    <div class="flex flex-wrap items-center gap-3 bg-slate-800 border border-orange-500/40 rounded-xl px-4 py-2.5 shadow-lg">
+        <span class="text-slate-200 text-sm font-semibold">
+            <span id="selectedCount">0</span> lead<span id="selectedCountPlural">s</span> selected
+        </span>
+        <div class="flex-1"></div>
+        @if (Configuration.GetValue<bool>("FeatureFlags:EnrichmentEnabled"))
+        {
+        <button id="btnBulkEnrich" onclick="bulkEnrich()"
+            class="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold transition">
+            <i class="fa-solid fa-bolt"></i>Enrich
+        </button>
+        }
+        <button id="btnBulkExport" onclick="bulkExport()"
+            class="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 text-xs font-semibold transition">
+            <i class="fa-solid fa-file-csv text-brand"></i>Export
+        </button>
+        <button id="btnBulkDelete" onclick="bulkDelete()"
+            class="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/30 border border-red-500/40 text-red-400 text-xs font-semibold transition">
+            <i class="fa-solid fa-trash"></i>Delete
+        </button>
+        <button onclick="clearSelection()"
+            class="text-slate-400 hover:text-slate-200 text-xs font-semibold underline-offset-2 hover:underline transition">
+            Clear selection
+        </button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TAB: MY LEADS
+══════════════════════════════════════════════════════════════ -->
+<div id="panelLeads" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- Filter / search bar -->
+    <div class="mb-4 space-y-2 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+
+        <!-- Risk filter pills — scroll horizontally on mobile -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5" style="-ms-overflow-style:none;scrollbar-width:none;">
+            <button onclick="setFilter('all')" data-f="all"
+                class="filter-btn active flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 border border-slate-600">
+                All <span id="fAll" class="ml-1 opacity-60"></span>
+            </button>
+            <button onclick="setFilter('High')" data-f="High"
+                class="filter-btn flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 border border-slate-600">
+                <span class="text-red-400">● High</span> <span id="fHigh" class="ml-1 opacity-60"></span>
+            </button>
+            <button onclick="setFilter('Medium')" data-f="Medium"
+                class="filter-btn flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 border border-slate-600">
+                <span class="text-orange-400">● Medium</span> <span id="fMedium" class="ml-1 opacity-60"></span>
+            </button>
+            <button onclick="setFilter('Low')" data-f="Low"
+                class="filter-btn flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 border border-slate-600">
+                <span class="text-green-400">● Low</span> <span id="fLow" class="ml-1 opacity-60"></span>
+            </button>
+        </div>
+
+        <!-- Search — full width on mobile -->
+        <div class="relative sm:flex-1 sm:min-w-[200px] sm:max-w-sm sm:ml-auto">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+            <input id="searchInput" type="text" placeholder="Search address, owner…"
+                oninput="renderTable()"
+                class="w-full pl-8 pr-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white text-xs
+                       placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition" />
+        </div>
+    </div>
+
+    <!-- Mobile card list (< md) -->
+    <div id="mobileCards" class="md:hidden space-y-3 mb-4"></div>
+
+    <!-- Desktop table (md+) -->
+    <div class="hidden md:block rounded-2xl border border-slate-700/60 shadow-xl bg-slate-800/40 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table id="leadsTable" class="w-full border-collapse">
+                <thead>
+                    <tr>
+                        <th id="thCheckbox" class="w-8 text-center" style="cursor:default">
+                            <input type="checkbox" id="selectAll" class="accent-orange-500 w-4 h-4 cursor-pointer" onchange="toggleSelectAll(this)" title="Select all" />
+                        </th>
+                        <th onclick="sortBy('address')"          class="text-left"   style="min-width:160px"><span class="sort-icon">Address</span></th>
+                        <th onclick="sortBy('riskLevel')"        class="text-left"   style="min-width:75px"><span class="sort-icon">Risk</span></th>
+                        <th onclick="sortBy('hailSize')"         class="text-left hidden md:table-cell" style="min-width:80px"><span class="sort-icon">Hail</span></th>
+                        <th onclick="sortBy('lastStormDate')"    class="text-left hidden md:table-cell" style="min-width:115px"><span class="sort-icon">Storm / Claim</span></th>
+                        <th onclick="sortBy('status')"           class="text-left hidden md:table-cell" style="min-width:130px"><span class="sort-icon">Status</span></th>
+                        <th class="text-center sticky-actions"   style="cursor:default; min-width:168px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="leadsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Loading state -->
+    <div id="leadsLoading" class="flex items-center justify-center py-14 gap-3 text-slate-400 text-sm">
+        <svg class="spinner w-5 h-5" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"
+                    stroke-dasharray="60" stroke-dashoffset="20" />
+        </svg>
+        Loading leads…
+    </div>
+
+    <!-- Empty state -->
+    <div id="leadsEmpty" class="hidden flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
+        <i class="fa-solid fa-bookmark text-4xl text-slate-700 mb-1"></i>
+        <p class="font-semibold text-slate-400">No saved leads yet</p>
+        <p class="text-sm">Go back and scan a neighborhood, then save properties.</p>
+        <a href="/" class="mt-3 px-4 py-2 rounded-lg bg-brand text-white text-xs font-semibold hover:bg-brand-dark transition">
+            <i class="fa-solid fa-magnifying-glass mr-1"></i>Start a Scan
+        </a>
+    </div>
+
+    <!-- No-match (filter/search) -->
+    <div id="leadsNoMatch" class="hidden flex flex-col items-center justify-center py-14 text-slate-500 gap-2">
+        <i class="fa-solid fa-filter text-3xl text-slate-700"></i>
+        <p class="text-sm">No leads match this filter or search.</p>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TAB: DATA SOURCES (enrichment — hidden when flag is off)
+══════════════════════════════════════════════════════════════ -->
+@if (Configuration.GetValue<bool>("FeatureFlags:EnrichmentEnabled"))
+{
+<div id="panelSources" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <div class="mb-6 p-5 rounded-2xl bg-brand/10 border border-brand/30">
+        <h2 class="text-base font-bold text-brand mb-1">
+            <i class="fa-solid fa-lightbulb mr-2"></i>How to make this real data
+        </h2>
+        <p class="text-slate-300 text-sm leading-relaxed">
+            Right now the app generates simulated hail data and leaves owner fields blank. Replacing it with real data
+            takes three steps: swap the storm data source, enrich with property owner records, then skip-trace for
+            contact info. The services below are what real roofing contractors use. Most have affordable per-record pricing.
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+
+        <!-- ── Storm & Hail Data ── -->
+        <div class="col-span-full">
+            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+                <i class="fa-solid fa-cloud-bolt mr-2 text-brand"></i>Step 1 — Replace Simulated Storm Data
+            </h3>
+        </div>
+
+        <div class="source-card rounded-2xl bg-slate-800/60 border border-slate-700/60 p-5">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <p class="font-bold text-white text-sm">HailTrace</p>
+                    <p class="text-xs text-slate-400">hailtrace.com</p>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30 text-xs font-semibold">Recommended</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed mb-3">
+                Built specifically for roofing contractors. Returns hail history (date, stone size, damage probability)
+                for any address. Drop-in replacement for <code class="bg-slate-700 px-1 rounded text-brand">GenerateNearbyProperties()</code>.
+            </p>
+            <div class="bg-slate-900 rounded-lg p-3 text-xs font-mono text-slate-400">
+                GET hailtrace.com/api/v1/hail?lat=32.7&amp;lng=-96.8&amp;radius=0.5mi
+            </div>
+            <p class="text-slate-500 text-xs mt-2">Pricing: ~$0.03–$0.10 per address lookup</p>
+        </div>
+
+        <div class="source-card rounded-2xl bg-slate-800/60 border border-slate-700/60 p-5">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <p class="font-bold text-white text-sm">StormAware</p>
+                    <p class="text-xs text-slate-400">stormaware.us</p>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 text-xs font-semibold">Popular</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed mb-3">
+                Storm history API with hail size, wind speed, and date of impact per address. Used widely in
+                Texas and Midwest roofing markets. Includes a damage severity score.
+            </p>
+            <div class="bg-slate-900 rounded-lg p-3 text-xs font-mono text-slate-400">
+                GET api.stormaware.us/v2/history?address=...&amp;days=730
+            </div>
+            <p class="text-slate-500 text-xs mt-2">Pricing: subscription or per-lookup tiers</p>
+        </div>
+
+        <div class="source-card rounded-2xl bg-slate-800/60 border border-slate-700/60 p-5">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <p class="font-bold text-white text-sm">NOAA NEXRAD</p>
+                    <p class="text-xs text-slate-400">ncei.noaa.gov</p>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-slate-500/30 text-slate-400 border border-slate-600 text-xs font-semibold">Free</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed mb-3">
+                NOAA's public radar archive. Free but requires significant processing — you'd parse raw
+                Level-II radar data yourself. Best for developers who want full control at no cost.
+            </p>
+            <div class="bg-slate-900 rounded-lg p-3 text-xs font-mono text-slate-400">
+                ncei.noaa.gov/access/search/data-search/nexrad-level-2
+            </div>
+            <p class="text-slate-500 text-xs mt-2">Pricing: Free (compute costs apply)</p>
+        </div>
+
+        <!-- ── Property & Owner Data ── -->
+        <div class="col-span-full mt-4">
+            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+                <i class="fa-solid fa-house-user mr-2 text-brand"></i>Step 2 — Get Property Owner Names
+            </h3>
+        </div>
+
+        <div class="source-card rounded-2xl bg-slate-800/60 border border-slate-700/60 p-5">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <p class="font-bold text-white text-sm">ATTOM Data Solutions</p>
+                    <p class="text-xs text-slate-400">attomdata.com</p>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30 text-xs font-semibold">Best Coverage</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed mb-3">
+                The most comprehensive property database in the US. Returns owner name, purchase date, estimated
+                value, mortgage info, and property details for 155M+ properties. Integrates directly with this app's
+                <code class="bg-slate-700 px-1 rounded text-brand">PATCH /Leads/{'{id}'}/Owner</code> endpoint.
+            </p>
+            <div class="bg-slate-900 rounded-lg p-3 text-xs font-mono text-slate-400">
+                GET api.gateway.attomdata.com/propertyapi/v1.0.0/property/detail?address=...
+            </div>
+            <p class="text-slate-500 text-xs mt-2">Pricing: ~$0.10–$0.30/record, monthly plans available</p>
+        </div>
+
+        <div class="source-card rounded-2xl bg-slate-800/60 border border-slate-700/60 p-5">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <p class="font-bold text-white text-sm">Regrid Parcel Data</p>
+                    <p class="text-xs text-slate-400">regrid.com</p>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 text-xs font-semibold">Free Tier</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed mb-3">
+                Aggregates county assessor data for all 50 states. Returns the legal owner name (as recorded
+                at the county). Free tier available for small volume — ideal for testing before committing to ATTOM.
+            </p>
+            <div class="bg-slate-900 rounded-lg p-3 text-xs font-mono text-slate-400">
+                GET app.regrid.com/api/v1/parcel?lat=32.7&amp;lon=-96.8&amp;token=...
+            </div>
+            <p class="text-slate-500 text-xs mt-2">Pricing: Free tier, then $0.01–$0.05/lookup</p>
+        </div>
+
+        <div class="source-card rounded-2xl bg-slate-800/60 border border-slate-700/60 p-5">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <p class="font-bold text-white text-sm">County Assessor Portals</p>
+                    <p class="text-xs text-slate-400">Public records</p>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-slate-500/30 text-slate-400 border border-slate-600 text-xs font-semibold">Free</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed">
+                Every county publishes property ownership as public record. Most have bulk download files
+                (CSV/XML) updated annually. For a single market, scraping or downloading the county file
+                once can cover all your leads for free. Search "<em>your county</em> property tax records open data".
+            </p>
+        </div>
+
+        <!-- ── Skip Tracing / Contact Info ── -->
+        <div class="col-span-full mt-4">
+            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+                <i class="fa-solid fa-phone mr-2 text-brand"></i>Step 3 — Find Phone &amp; Email (Skip Tracing)
+            </h3>
+        </div>
+
+        <div class="source-card rounded-2xl bg-slate-800/60 border border-slate-700/60 p-5">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <p class="font-bold text-white text-sm">BatchSkipTracing</p>
+                    <p class="text-xs text-slate-400">batchskiptracing.com</p>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30 text-xs font-semibold">Recommended</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed mb-3">
+                Purpose-built for contractors and real estate investors. Upload a CSV of addresses, get back
+                owner name + best phone + email within minutes. Extremely affordable and widely used in roofing.
+            </p>
+            <div class="bg-slate-900 rounded-lg p-3 text-xs font-mono text-slate-400">
+                POST batchskiptracing.com/api/v2/skip<br/>
+                Body: [{"{ address, city, state, zip }"}]
+            </div>
+            <p class="text-slate-500 text-xs mt-2">Pricing: ~$0.12/record — bulk discounts available</p>
+        </div>
+
+        <div class="source-card rounded-2xl bg-slate-800/60 border border-slate-700/60 p-5">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <p class="font-bold text-white text-sm">Whitepages Pro</p>
+                    <p class="text-xs text-slate-400">pro.whitepages.com</p>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 text-xs font-semibold">Per Lookup</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed mb-3">
+                Reverse address lookup that returns owner name and phone numbers. High match rate and
+                real-time results. Good for one-off enrichment when you don't need bulk processing.
+            </p>
+            <div class="bg-slate-900 rounded-lg p-3 text-xs font-mono text-slate-400">
+                GET proapi.whitepages.com/3.0/place.json?address.street_line=...&amp;api_key=...
+            </div>
+            <p class="text-slate-500 text-xs mt-2">Pricing: ~$0.25–$0.50/lookup</p>
+        </div>
+
+        <div class="source-card rounded-2xl bg-slate-800/60 border border-slate-700/60 p-5">
+            <div class="flex items-start justify-between mb-3">
+                <div>
+                    <p class="font-bold text-white text-sm">Melissa Data</p>
+                    <p class="text-xs text-slate-400">melissa.com</p>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-slate-500/30 text-slate-400 border border-slate-600 text-xs font-semibold">Enterprise</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed">
+                Address verification + contact enrichment in one API. Returns owner name, phone, email,
+                and address corrections. Well-suited if you also want to clean/validate the addresses
+                coming in from the Google autocomplete.
+            </p>
+        </div>
+
+        <!-- ── Integration roadmap ── -->
+        <div class="col-span-full mt-4">
+            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+                <i class="fa-solid fa-code-branch mr-2 text-brand"></i>Integration Roadmap
+            </h3>
+            <div class="rounded-2xl bg-slate-800/60 border border-slate-700/60 p-6">
+                <ol class="space-y-4">
+                    <li class="flex gap-4">
+                        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-brand/20 border border-brand/40 flex items-center justify-center text-brand text-xs font-bold">1</div>
+                        <div>
+                            <p class="text-white text-sm font-semibold">Replace <code class="bg-slate-700 px-1 rounded text-brand text-xs">GenerateNearbyProperties()</code> in RoofHealthController.cs</p>
+                            <p class="text-slate-400 text-xs mt-0.5">Call HailTrace or StormAware with the geocoded lat/lng. Map their response to the existing <code class="bg-slate-700 px-1 rounded text-brand text-xs">PropertyRecord</code> shape — the rest of the app just works.</p>
+                        </div>
+                    </li>
+                    <li class="flex gap-4">
+                        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-brand/20 border border-brand/40 flex items-center justify-center text-brand text-xs font-bold">2</div>
+                        <div>
+                            <p class="text-white text-sm font-semibold">Add background enrichment after a lead is saved</p>
+                            <p class="text-slate-400 text-xs mt-0.5">In <code class="bg-slate-700 px-1 rounded text-brand text-xs">LeadsController.Save()</code>, after inserting, enqueue a background job to call ATTOM or Regrid for the owner name and store it via <code class="bg-slate-700 px-1 rounded text-brand text-xs">PATCH /Leads/{id}/Owner</code>.</p>
+                        </div>
+                    </li>
+                    <li class="flex gap-4">
+                        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-brand/20 border border-brand/40 flex items-center justify-center text-brand text-xs font-bold">3</div>
+                        <div>
+                            <p class="text-white text-sm font-semibold">Bulk skip-trace from the Saved Leads page</p>
+                            <p class="text-slate-400 text-xs mt-0.5">Add an &ldquo;Enrich All&rdquo; button that exports leads without owner info to BatchSkipTracing, then re-imports the results &mdash; filling in phone and email columns automatically.</p>
+                        </div>
+                    </li>
+                    <li class="flex gap-4">
+                        <div class="flex-shrink-0 w-7 h-7 rounded-full bg-brand/20 border border-brand/40 flex items-center justify-center text-brand text-xs font-bold">4</div>
+                        <div>
+                            <p class="text-white text-sm font-semibold">Export to CRM</p>
+                            <p class="text-slate-400 text-xs mt-0.5">Use the existing Export CSV button (or a new webhook) to push enriched leads directly into a CRM like HubSpot, JobNimbus, or AccuLynx &mdash; the tools roofing contractors actually work from.</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </div>
+
+    </div>
+</div>
+}
+
+<footer class="mt-12 border-t border-slate-700/60 bg-slate-900/60">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
+        <div class="flex items-center gap-2">
+            <div class="w-5 h-5 bg-brand/80 rounded flex items-center justify-center">
+                <i class="fa-solid fa-house-chimney text-white text-xs"></i>
+            </div>
+            <span>StormLead Pro &copy; 2026</span>
+        </div>
+        <span>Owner data columns are editable &mdash; click the pencil icon on any row</span>
+    </div>
+</footer>
+
+<script src="~/js/claim-window.js" asp-append-version="true"></script>
+<script src="~/js/saved-leads.js" asp-append-version="true"></script>
+</body>
+</html>

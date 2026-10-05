@@ -1,0 +1,181 @@
+@{
+    Layout = null;
+    var trialEndsAt  = ViewBag.TrialEndsAt as DateTime?;
+    var companyName  = ViewBag.CompanyName as string ?? "your team";
+    var publishableKey = ViewBag.StripePublishableKey as string ?? "";
+    // Html.Raw + JsonSerializer (not a hand-built @(...) interpolation) because
+    // @() output is HTML-encoded by default — a plain `Stripe("pk_...")` string
+    // would come out as `Stripe(&quot;pk_...&quot;)` inside <script>, which
+    // browsers don't decode for raw-text elements like <script>.
+    var stripeInitJs = string.IsNullOrWhiteSpace(publishableKey)
+        ? "null"
+        : "Stripe(" + System.Text.Json.JsonSerializer.Serialize(publishableKey) + ")";
+    // Build the support mailto here (rather than inline in markup) so the
+    // literal "@" in the email address never sits next to a Razor @() expression.
+    var supportEmail  = "stormlead.pro@gmail.com";
+    var supportMailto = "mailto:" + supportEmail;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Choose a plan — StormLead Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" />
+    <!-- Embedded Checkout (ui_mode=embedded_page) — must load from js.stripe.com, never bundled/self-hosted. -->
+    <script src="https://js.stripe.com/dahlia/stripe.js"></script>
+    <style>
+        .card-hover { transition: transform 0.2s ease, border-color 0.2s ease; }
+        .card-hover:hover { transform: translateY(-2px); border-color: rgba(249,115,22,0.4); }
+    </style>
+</head>
+<body class="min-h-screen bg-navy text-white">
+
+<!-- Hidden antiforgery token — read by JS, no wrapping <form> needed. -->
+<div style="display:none">@Html.AntiForgeryToken()</div>
+
+<!-- Header -->
+<header class="border-b border-slate-700/60">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center shadow">
+                <i class="fa-solid fa-house-chimney text-white text-sm"></i>
+            </div>
+            <span class="text-lg font-extrabold tracking-tight">Storm<span class="text-brand">Lead</span> Pro</span>
+        </div>
+        @await Html.PartialAsync("_AccountMenu")
+    </div>
+</header>
+
+<!-- Banner -->
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-6 text-center">
+    <div class="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold uppercase tracking-widest px-4 py-1.5 rounded-full mb-5">
+        <i class="fa-solid fa-clock"></i>Trial ended
+    </div>
+    <h1 class="text-3xl sm:text-4xl font-black mb-3">Your free trial has ended</h1>
+    <p class="text-slate-400 max-w-xl mx-auto">
+        @(companyName)'s 14-day free trial
+        @if (trialEndsAt.HasValue)
+        {
+            <text> ended on @trialEndsAt.Value.ToString("MMM d, yyyy")</text>
+        }
+        . Pick a plan below to keep generating hail reports, running storm alerts, and tracking your pipeline.
+    </p>
+</div>
+
+<!-- Pricing -->
+<section class="px-6 pb-16">
+    <div class="max-w-5xl mx-auto">
+
+        <div id="checkoutError" class="hidden mb-6 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 px-4 py-3 text-sm text-center">
+            <i class="fa-solid fa-triangle-exclamation mr-2"></i><span id="checkoutErrorText"></span>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-6 items-start">
+
+            <!-- Starter -->
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-7">
+                <p class="text-sm font-semibold text-slate-400 mb-1">Starter</p>
+                <div class="flex items-end gap-1 mb-1">
+                    <span class="text-4xl font-black text-white">$14.99</span>
+                    <span class="text-slate-500 mb-1.5">/month</span>
+                </div>
+                <p class="text-xs text-slate-500 mb-4">10 PDF reports/mo &mdash; about $1.50 each</p>
+                <button type="button" onclick="startCheckout('starter')"
+                    class="block w-full text-center bg-slate-700 hover:bg-slate-600 text-white font-semibold text-sm py-3 rounded-xl transition mb-7">
+                    Upgrade to Starter
+                </button>
+                <ul class="space-y-3 text-sm text-slate-300">
+                    <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>10 PDF hail reports every month</li>
+                    <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Full access to Storm Explorer &amp; Neighborhood Scan</li>
+                    <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Storm alerts for watched areas</li>
+                    <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>CSV export</li>
+                    <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Need more? Top up 3 reports for $5.99 anytime</li>
+                </ul>
+            </div>
+
+            <!-- Pro -->
+            <div class="pricing-popular card-hover bg-slate-800/80 border-2 border-brand/50 rounded-2xl p-7 mt-4 relative">
+                <span class="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">Best Value</span>
+                <p class="text-sm font-semibold text-brand mb-1">Pro</p>
+                <div class="flex items-end gap-1 mb-1">
+                    <span class="text-4xl font-black text-white">$39.99</span>
+                    <span class="text-slate-500 mb-1.5">/month</span>
+                </div>
+                <p class="text-xs text-slate-500 mb-4">Unlimited PDF hail reports &mdash; no monthly cap</p>
+                <button type="button" onclick="startCheckout('pro')"
+                    class="block w-full text-center bg-brand hover:bg-orange-400 text-white font-bold text-sm py-3 rounded-xl transition mb-7 shadow-lg shadow-orange-500/20">
+                    Upgrade to Pro
+                </button>
+                <ul class="space-y-3 text-sm text-slate-300">
+                    <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Unlimited PDF hail reports</li>
+                    <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Everything in Starter</li>
+                    <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>No per-report math to worry about</li>
+                    <li class="flex gap-2.5"><i class="fa-solid fa-check text-green-400 mt-0.5 shrink-0"></i>Built for teams running high lead volume</li>
+                </ul>
+            </div>
+
+        </div>
+
+        <!-- Pay-as-you-go: no subscription -->
+        <div class="mt-8 bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6 sm:p-8 text-center">
+            <p class="text-sm font-semibold text-white mb-1">Don't want a subscription?</p>
+            <p class="text-slate-400 text-sm mb-5">Buy hail reports in bulk, one time, no recurring commitment &mdash; never expires.</p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <button type="button" onclick="startCheckout('pack50')" class="flex-1 max-w-xs w-full flex items-center justify-center gap-2 bg-slate-900/60 border border-slate-700/60 hover:border-brand/50 rounded-xl px-5 py-4 transition">
+                    <span class="text-xl font-black text-white">$59.99</span>
+                    <span class="text-slate-400 text-sm">for 50 reports <span class="text-slate-500">(~$1.20 each)</span></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Continue without paying -->
+        <div class="text-center mt-10">
+            <form method="post" action="/Billing/ContinueFree" class="inline">
+                <button type="submit" class="text-slate-500 hover:text-slate-300 text-sm underline underline-offset-2 transition">
+                    Not ready? Continue with limited free access instead
+                </button>
+            </form>
+        </div>
+
+        <p class="text-center text-slate-600 text-xs mt-6">
+            Need help? <a href="/Help" class="text-orange-400 hover:text-orange-300">Visit the help center</a>
+            or email <a href="@supportMailto" class="text-orange-400 hover:text-orange-300">@supportEmail</a>.
+        </p>
+    </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════
+     Embedded Checkout modal — Stripe mounts its payment iframe into
+     #checkout-container. Stays on this page/domain the whole time.
+══════════════════════════════════════════════════════════════ -->
+<div id="checkoutModal" class="hidden fixed inset-0 z-50 bg-navy/90 backdrop-blur-sm overflow-y-auto">
+    <div class="max-w-lg mx-auto px-4 py-10">
+        <button type="button" onclick="closeCheckoutModal()"
+            class="flex items-center gap-1.5 text-slate-400 hover:text-white text-sm font-semibold mb-4 transition">
+            <i class="fa-solid fa-arrow-left"></i>Back to plans
+        </button>
+        <div class="bg-white rounded-2xl overflow-hidden shadow-2xl min-h-[320px]">
+            <div id="checkoutLoading" class="flex items-center justify-center py-20 text-slate-400 gap-3">
+                <svg class="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="60" stroke-dashoffset="20" />
+                </svg>
+                Loading checkout&hellip;
+            </div>
+            <div id="checkout-container"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Per-request value from the server — can't live in the static billing-upgrade.js
+    // file since it's built server-side (whether Stripe is configured, publishable key).
+    window.stripe = @Html.Raw(stripeInitJs);
+</script>
+<script src="~/js/billing-upgrade.js" asp-append-version="true"></script>
+
+</body>
+</html>

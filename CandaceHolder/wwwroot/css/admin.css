@@ -1,0 +1,46 @@
+/* ══════════════════════════════════════════════════════════════
+   StormLead Pro — Admin page styles
+   Loaded only by Views/Admin/Index.cshtml
+══════════════════════════════════════════════════════════════ */
+
+.admin-users-table th {
+    background: #1e293b;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 10px 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.admin-users-table tbody tr {
+    border-bottom: 1px solid rgba(51,65,85,0.5);
+    transition: background 0.15s;
+}
+.admin-users-table tbody tr:hover { background: rgba(249,115,22,0.04); }
+
+.admin-users-table tbody td {
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #cbd5e1;
+    vertical-align: middle;
+}
+
+/* Active/Expired Users collapsible sections (added 2026-07-23) — native
+   <details>/<summary>, no JS needed. Hide the default disclosure marker so
+   the manual .admin-caret-icon (a chevron that rotates on [open]) is the
+   only indicator shown. */
+.admin-collapsible-summary {
+    list-style: none;
+}
+.admin-collapsible-summary::-webkit-details-marker {
+    display: none;
+}
+.admin-caret-icon {
+    display: inline-block;
+    transition: transform 0.15s ease;
+}
+details[open] > .admin-collapsible-summary .admin-caret-icon {
+    transform: rotate(90deg);
+}

@@ -1,0 +1,540 @@
+@using CandaceHolder.Controllers
+@{
+    Layout = null;
+    var alertsEnabled    = Configuration.GetValue<bool>("FeatureFlags:AlertsEnabled");
+    var recentLeads      = ViewBag.RecentLeads as List<RecentLeadVm> ?? new();
+    var showUpgradeNudge = ViewBag.ShowUpgradeNudge is true;
+}
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StormLead Pro — Roofing Lead Generation</title>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <style>
+        .se-hover-panel {
+            background: rgba(15,20,32,0.97);
+            border: 1px solid rgba(100,116,139,0.35);
+            border-radius: 14px;
+            padding: 14px 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            color: #cbd5e1;
+            font-family: inherit;
+            pointer-events: none;
+            margin-top: 8px;
+        }
+    </style>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+    <!-- Google Maps Places — define callback BEFORE async script loads -->
+    <script src="~/js/home-index-autocomplete.js" asp-append-version="true"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=@ViewBag.GoogleMapsApiKey&libraries=places&callback=initAutocomplete" async></script>
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body class="min-h-screen">
+
+@await Html.PartialAsync("_TrialBanner")
+
+<!-- ══════════════════════════════════════════════════════════════
+     HEADER / NAV
+══════════════════════════════════════════════════════════════ -->
+<header class="sticky top-0 z-50 bg-navy border-b border-slate-700/60 shadow-lg relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+
+        <!-- Logo -->
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center shadow">
+                <i class="fa-solid fa-house-chimney text-white text-sm"></i>
+            </div>
+            <span class="text-lg font-bold tracking-tight">
+                Storm<span class="text-brand">Lead</span> Pro
+            </span>
+        </div>
+
+        <!-- Nav links (desktop) -->
+        <nav class="hidden lg:flex items-center gap-6 text-sm text-slate-400">
+            <a href="#search" class="hover:text-white transition-colors">Search</a>
+            <a href="/Leads/Saved" class="hover:text-white transition-colors">Saved Leads</a>
+            <a href="/Dashboard" class="hover:text-white transition-colors">Dashboard</a>
+            @if (alertsEnabled)
+            {
+                <a href="/Alerts" class="hover:text-white transition-colors">
+                    <i class="fa-solid fa-bell mr-1 text-xs"></i>Alerts
+                </a>
+            }
+            <a href="/Help" class="hover:text-white transition-colors">
+                <i class="fa-solid fa-circle-question mr-1 text-xs"></i>Help
+            </a>
+            @if (User.FindFirst("admin_role")?.Value is "admin" or "super_admin" ||
+                 string.Equals(User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "", Configuration["AdminEmail"], System.StringComparison.OrdinalIgnoreCase)) {
+                <a href="/Admin" class="text-orange-400 hover:text-orange-300 transition-colors text-xs">
+                    <i class="fa-solid fa-shield-halved mr-1"></i>Admin
+                </a>
+            }
+            <span class="text-slate-600">|</span>
+            @await Html.PartialAsync("_AccountMenu")
+        </nav>
+
+        <!-- Hamburger (mobile only) -->
+        <button id="mobileMenuBtn" onclick="toggleMobileMenu()"
+            class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors">
+            <i id="mobileMenuIcon" class="fa-solid fa-bars text-lg"></i>
+        </button>
+    </div>
+
+    <!-- Mobile nav drawer -->
+    <div id="mobileMenu" class="hidden lg:hidden absolute top-full left-0 right-0 bg-navy border-t border-slate-700/60 shadow-2xl z-50 px-4 py-3 flex flex-col gap-1">
+        <a href="/" class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-700/60 text-white font-semibold text-sm">
+            <i class="fa-solid fa-magnifying-glass text-brand w-4 text-center text-xs"></i>Search
+        </a>
+        <a href="/Leads/Saved" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-bookmark w-4 text-center text-xs"></i>Saved Leads
+        </a>
+        <a href="/Dashboard" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-chart-bar w-4 text-center text-xs"></i>Dashboard
+        </a>
+        @if (alertsEnabled)
+        {
+            <a href="/Alerts" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+                <i class="fa-solid fa-bell w-4 text-center text-xs"></i>Alerts
+            </a>
+        }
+        <a href="/Help" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-circle-question w-4 text-center text-xs"></i>Help
+        </a>
+        <div class="border-t border-slate-700/60 my-1"></div>
+        @await Html.PartialAsync("_AccountMenuMobile")
+    </div>
+</header>
+
+<!-- Toast notification -->
+<div id="toast">
+    <i id="toastIcon" class="fa-solid fa-circle-check"></i>
+    <span id="toastMsg"></span>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MAIN TAB BAR  (always visible, sticky below nav)
+══════════════════════════════════════════════════════════════ -->
+<div id="mainTabBar" class="bg-slate-900/80 border-b border-slate-700/60 sticky top-16 z-40 backdrop-blur-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex">
+        <button id="tabBtnNeighborhood" onclick="switchMainTab('neighborhood')"
+            class="flex items-center gap-2 px-5 py-3.5 text-sm font-semibold
+                   border-b-2 border-brand text-white -mb-px transition-colors">
+            <i class="fa-solid fa-house-chimney text-brand/80 text-xs"></i>
+            Neighborhood Scan
+        </button>
+        <button id="tabBtnStorm" onclick="switchMainTab('storm')"
+            class="flex items-center gap-2 px-5 py-3.5 text-sm font-semibold
+                   border-b-2 border-transparent text-slate-400 hover:text-slate-200 -mb-px transition-colors">
+            <i class="fa-solid fa-cloud-bolt text-xs"></i>
+            Storm Explorer
+            <span class="px-1.5 py-0.5 rounded-full bg-brand/20 text-brand text-xs font-bold leading-none">BETA</span>
+        </button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     NEIGHBORHOOD SCAN PANEL  (search form + results)
+══════════════════════════════════════════════════════════════ -->
+<div id="neighborhoodPanel">
+
+    <!-- Search form -->
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+        <div class="bg-slate-800/80 backdrop-blur rounded-2xl shadow-2xl border border-slate-700/60 p-6 sm:p-8">
+
+            <!-- Mode toggle -->
+            <div class="flex items-center gap-1 mb-4 bg-slate-900/60 rounded-xl p-1 w-fit border border-slate-700/60">
+                <button id="modeNeighborhood" type="button"
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all
+                           bg-brand text-white shadow">
+                    <i class="fa-solid fa-house-chimney"></i>Neighborhood
+                </button>
+                <button id="modeSingle" type="button"
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all
+                           text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-crosshairs"></i>Single Address
+                </button>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3">
+
+                <!-- Address input -->
+                <div class="relative flex-1">
+                    <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-location-dot text-slate-400"></i>
+                    </div>
+                    <input
+                        id="addressInput"
+                        type="text"
+                        placeholder="123 Main St, Dallas, TX"
+                        class="w-full pl-9 pr-4 py-3.5 rounded-xl bg-slate-900 border border-slate-600 text-white placeholder-slate-500
+                               focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition"
+                    />
+                </div>
+
+                <!-- Radius selector (hidden in single-address mode) -->
+                <div id="radiusWrapper" class="relative">
+                    <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-circle-dot text-slate-400 text-xs"></i>
+                    </div>
+                    <select
+                        id="radiusSelect"
+                        class="pl-8 pr-8 py-3.5 rounded-xl bg-slate-900 border border-slate-600 text-white appearance-none
+                               focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition cursor-pointer"
+                    >
+                        <option value="0.25">0.25 mi</option>
+                        <option value="0.5">0.5 mi</option>
+                        <option value="1" selected>1 mi</option>
+                        <option value="2">2 mi</option>
+                        <option value="3">3 mi</option>
+                    </select>
+                    <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-chevron-down text-slate-400 text-xs"></i>
+                    </div>
+                </div>
+
+                <!-- Submit button -->
+                <button
+                    id="scanBtn"
+                    onclick="runScan()"
+                    class="flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-brand hover:bg-brand-dark
+                           text-white font-bold text-sm tracking-wide shadow-lg shadow-brand/30
+                           transition-all active:scale-95 whitespace-nowrap"
+                >
+                    <span id="btnText">
+                        <i class="fa-solid fa-radar mr-1"></i>Scan Neighborhood
+                    </span>
+                </button>
+            </div>
+
+            <!-- Error message -->
+            <div id="errorMsg" class="hidden mt-4 flex items-center gap-2 text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span id="errorText">Something went wrong. Please try again.</span>
+            </div>
+        </div>
+    </div>
+
+    @if (showUpgradeNudge)
+    {
+        <!-- ══════════════════════════════════════════════════════════
+             UPGRADE NUDGE  (trial/Starter orgs, added 2026-07-23)
+        ══════════════════════════════════════════════════════════ -->
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 -mt-4 pb-6">
+            <div class="bg-gradient-to-r from-brand/10 to-orange-600/5 border border-brand/30 rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-center gap-3 justify-between">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-9 h-9 rounded-xl bg-brand/20 flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-bolt text-brand"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-white">Upgrade to Pro for unlimited PDF reports</p>
+                        <p class="text-xs text-slate-400">No monthly cap — generate as many hail reports as you need.</p>
+                    </div>
+                </div>
+                <a href="/Billing/Upgrade" class="shrink-0 px-4 py-2 rounded-lg bg-brand hover:bg-orange-400 text-white text-xs font-bold transition whitespace-nowrap">
+                    See plans
+                </a>
+            </div>
+        </div>
+    }
+
+    @if (recentLeads.Any())
+    {
+        <!-- ══════════════════════════════════════════════════════════
+             CONTINUE  (recently saved leads, added 2026-07-23)
+        ══════════════════════════════════════════════════════════ -->
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 pb-10 -mt-2">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-700/60 flex items-center justify-between">
+                    <h2 class="text-sm font-bold text-white">
+                        <i class="fa-solid fa-clock-rotate-left text-brand mr-2"></i>Continue
+                    </h2>
+                    <a href="/Leads/Saved" class="text-xs text-brand hover:text-orange-400 font-semibold">
+                        View all <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </a>
+                </div>
+                <div class="divide-y divide-slate-700/60">
+                    @foreach (var lead in recentLeads)
+                    {
+                        var riskColor = lead.RiskLevel switch
+                        {
+                            "High"   => "text-red-400",
+                            "Medium" => "text-orange-400",
+                            "Low"    => "text-green-400",
+                            _        => "text-slate-500"
+                        };
+                        <a href="/Leads/@lead.Id" class="flex items-center justify-between gap-3 px-5 py-3.5 hover:bg-slate-700/30 transition-colors">
+                            <div class="min-w-0">
+                                <p class="text-sm text-slate-200 truncate">@lead.Address</p>
+                                <p class="text-xs text-slate-500">@lead.SavedAt.ToString("MMM d, yyyy")</p>
+                            </div>
+                            @if (!string.IsNullOrEmpty(lead.RiskLevel))
+                            {
+                                <span class="text-xs font-semibold @riskColor shrink-0">@lead.RiskLevel</span>
+                            }
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+<!-- ══════════════════════════════════════════════════════════════
+     RESULTS SECTION
+══════════════════════════════════════════════════════════════ -->
+<section id="results" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+    <!-- ── Summary bar ── -->
+    <div class="mb-6 flex flex-wrap items-center gap-3">
+        <div class="flex-1 min-w-0">
+            <h2 class="text-xl font-bold text-white truncate">
+                <i class="fa-solid fa-map-pin text-brand mr-2"></i>
+                <span id="centerLabel">Results</span>
+            </h2>
+        </div>
+        <!-- count badges -->
+        <div class="flex flex-wrap gap-2">
+            <div class="summary-badge flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-700 border border-slate-600 text-sm">
+                <span class="text-slate-300 font-medium">Total:</span>
+                <span id="countTotal" class="text-white font-bold">0</span>
+            </div>
+            <div class="summary-badge flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-sm">
+                <span class="w-2 h-2 rounded-full bg-red-400 inline-block"></span>
+                <span class="text-red-300 font-medium">High:</span>
+                <span id="countHigh" class="text-red-200 font-bold">0</span>
+            </div>
+            <div class="summary-badge flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-sm">
+                <span class="w-2 h-2 rounded-full bg-orange-400 inline-block"></span>
+                <span class="text-orange-300 font-medium">Medium:</span>
+                <span id="countMedium" class="text-orange-200 font-bold">0</span>
+            </div>
+            <div class="summary-badge flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/30 text-sm">
+                <span class="w-2 h-2 rounded-full bg-green-400 inline-block"></span>
+                <span class="text-green-300 font-medium">Low:</span>
+                <span id="countLow" class="text-green-200 font-bold">0</span>
+            </div>
+            <span id="noaaBadge" class="hidden"></span>
+        </div>
+    </div>
+
+    <!-- ── Toolbar: filters + sort + export ── -->
+    <div class="mb-5 flex flex-wrap items-center gap-3">
+
+        <!-- Filter buttons -->
+        <div class="flex rounded-xl overflow-hidden border border-slate-700 shadow-sm">
+            <button class="filter-btn active px-4 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 transition" data-filter="all">All</button>
+            <button class="filter-btn px-4 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 transition border-l border-slate-700 text-red-300" data-filter="High">
+                <i class="fa-solid fa-circle-exclamation mr-1"></i>High
+            </button>
+            <button class="filter-btn px-4 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 transition border-l border-slate-700 text-orange-300" data-filter="Medium">
+                <i class="fa-solid fa-circle-minus mr-1"></i>Medium
+            </button>
+            <button class="filter-btn px-4 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 transition border-l border-slate-700 text-green-300" data-filter="Low">
+                <i class="fa-solid fa-circle-check mr-1"></i>Low
+            </button>
+        </div>
+
+        <!-- Sort -->
+        <div class="relative">
+            <div class="absolute inset-y-0 left-2.5 flex items-center pointer-events-none">
+                <i class="fa-solid fa-arrow-up-wide-short text-slate-500 text-xs"></i>
+            </div>
+            <select id="sortSelect"
+                class="pl-7 pr-6 py-2 text-xs rounded-xl bg-slate-800 border border-slate-700 text-slate-300
+                       appearance-none focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer">
+                <option value="risk">Sort: Risk Level</option>
+                <option value="date">Sort: Storm Date</option>
+                <option value="address">Sort: Address</option>
+            </select>
+        </div>
+
+        <div class="flex-1"></div>
+
+        <!-- Select All -->
+        <button id="selectAllBtn" onclick="toggleSelectAll()"
+            class="hidden flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600
+                   border border-slate-600 text-xs font-semibold text-slate-200 transition shadow">
+            <i class="fa-regular fa-square-check text-brand"></i>
+            <span id="selectAllLabel">Select All</span>
+        </button>
+
+        <!-- Save Selected -->
+        <button id="saveSelectedBtn" onclick="saveSelected()"
+            class="hidden flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-brand-dark
+                   text-white text-xs font-semibold transition shadow">
+            <i class="fa-solid fa-bookmark mr-1"></i>
+            Save Selected (<span id="selectedCount">0</span>)
+        </button>
+    </div>
+    <!-- Two-col: cards + map -->
+    <div class="flex flex-col lg:flex-row gap-6">
+
+        <!-- Card list -->
+        <div id="cardList" class="lg:w-96 xl:w-[420px] flex-shrink-0 overflow-y-auto max-h-[calc(100vh-220px)] pr-1 space-y-0">
+        </div>
+
+        <!-- Map -->
+        <div class="flex-1 rounded-2xl overflow-hidden border border-slate-700/60 shadow-xl min-h-[400px] lg:min-h-0"
+             style="height: calc(100vh - 220px); min-height: 420px;">
+            <div id="map" class="w-full h-full"></div>
+        </div>
+
+    </div>
+
+</section>
+
+</div><!-- end #neighborhoodPanel -->
+
+<!-- ══════════════════════════════════════════════════════════════
+     STORM EXPLORER SECTION  (hidden unless Storm Explorer tab is active)
+══════════════════════════════════════════════════════════════ -->
+<section id="stormExplorer" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Filter bar -->
+    <div class="mb-5 flex flex-wrap items-center gap-3 bg-slate-800/60 rounded-2xl border border-slate-700/60 px-5 py-3.5">
+        <i class="fa-solid fa-sliders text-brand text-sm"></i>
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filters</span>
+
+        <!-- Min hail size -->
+        <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400" for="seMinHail">Min Hail:</label>
+            <div class="relative">
+                <select id="seMinHail" onchange="applySeFilters()"
+                    class="pl-3 pr-7 py-1.5 rounded-lg bg-slate-900 border border-slate-600 text-white text-xs
+                           appearance-none focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer">
+                    <option value="0.5">&#8805; 0.50&quot; (pea)</option>
+                    <option value="0.75" selected>&#8805; 0.75&quot; (marble)</option>
+                    <option value="1.0">&#8805; 1.00&quot; (quarter)</option>
+                    <option value="1.5">&#8805; 1.50&quot; (half dollar)</option>
+                    <option value="2.0">&#8805; 2.00&quot; (golf ball)</option>
+                </select>
+                <div class="absolute inset-y-0 right-2 flex items-center pointer-events-none">
+                    <i class="fa-solid fa-chevron-down text-slate-500 text-xs"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lookback window -->
+        <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400" for="seLookback">Period:</label>
+            <div class="relative">
+                <select id="seLookback" onchange="applySeFilters()"
+                    class="pl-3 pr-7 py-1.5 rounded-lg bg-slate-900 border border-slate-600 text-white text-xs
+                           appearance-none focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer">
+                    <option value="30">Last 30 days</option>
+                    <option value="60">Last 60 days</option>
+                    <option value="90" selected>Last 90 days</option>
+                    <option value="180">Last 6 months</option>
+                    <option value="365">Last 12 months</option>
+                </select>
+                <div class="absolute inset-y-0 right-2 flex items-center pointer-events-none">
+                    <i class="fa-solid fa-chevron-down text-slate-500 text-xs"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wind toggle -->
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+            <span class="relative w-8 h-4 flex-shrink-0">
+                <input type="checkbox" id="seIncludeWind" class="sr-only peer" checked onchange="applySeFilters()">
+                <span class="block w-8 h-4 rounded-full bg-slate-700 peer-checked:bg-brand/70 transition-colors"></span>
+                <span class="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform peer-checked:translate-x-4 shadow"></span>
+            </span>
+            <i class="fa-solid fa-wind text-blue-400 text-xs"></i>
+            <span class="text-xs text-slate-300">Wind Events</span>
+        </label>
+
+        @if (ViewBag.HailSwathPolygons == true) {
+        <!-- Hail Swath Polygons overlay toggle -->
+        <button id="swathToggleBtn" onclick="toggleHailSwaths()"
+            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-600 bg-slate-900
+                   text-xs text-slate-400 hover:text-white hover:border-orange-500/60 transition-colors">
+            <i class="fa-solid fa-draw-polygon text-orange-400/70 text-xs"></i>
+            Hail Swaths
+        </button>
+        }
+
+        <!-- Hail Reports overlay toggle -->
+        <button id="mrmsToggleBtn" onclick="toggleHailReports()"
+            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-600 bg-slate-900
+                   text-xs text-slate-400 hover:text-white hover:border-sky-500/60 transition-colors">
+            <i class="fa-solid fa-circle-dot text-sky-500/70 text-xs"></i>
+            Hail Reports
+        </button>
+
+        <!-- Draw-a-rectangle bulk lead capture -->
+        <button id="seAreaSelectBtn" onclick="toggleSeAreaSelect()"
+            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-600 bg-slate-900
+                   text-xs text-slate-400 hover:text-white hover:border-brand/60 transition-colors">
+            <i class="fa-solid fa-draw-polygon text-brand/70 text-xs"></i>
+            Select Area
+        </button>
+
+        <div class="flex-1"></div>
+
+        <span id="seLoadingBadge" class="hidden text-xs text-slate-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-notch fa-spin text-brand"></i>Loading&hellip;
+        </span>
+        <span class="text-xs font-semibold text-slate-300">
+            <span id="seCount" class="text-brand font-bold">&mdash;</span> storms found
+        </span>
+    </div>
+
+    <!-- Two-column: event list + map -->
+    <div class="flex flex-col lg:flex-row gap-6" style="height: calc(100vh - 280px); min-height: 520px;">
+
+        <!-- Event list -->
+        <div id="seListWrapper" class="lg:w-96 xl:w-[420px] flex-shrink-0 overflow-y-auto pr-1">
+            <div id="seList">
+                <div class="flex flex-col items-center justify-center h-64 text-center text-slate-500 text-sm gap-3">
+                    <i class="fa-solid fa-cloud-bolt text-4xl text-slate-700"></i>
+                    <div>
+                        <div class="font-semibold text-slate-400 mb-1">No storms loaded yet</div>
+                        Pan the map to explore storms in any area.<br>
+                        Or search a neighborhood above, then come back here.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaflet map -->
+        <div class="flex-1 rounded-2xl overflow-hidden border border-slate-700/60 shadow-xl min-h-[320px]">
+            <div id="seMapContainer" class="w-full h-full"></div>
+        </div>
+
+    </div>
+
+</section>
+
+<footer class="mt-12 border-t border-slate-700/60 bg-slate-900/60">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
+        <div class="flex items-center gap-2">
+            <div class="w-5 h-5 bg-brand/80 rounded flex items-center justify-center">
+                <i class="fa-solid fa-house-chimney text-white text-xs"></i>
+            </div>
+            <span>StormLead Pro &copy; 2026</span>
+        </div>
+    </div>
+</footer>
+
+<script src="~/js/claim-window.js"></script>
+<script src="~/js/site.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script>window.MAPTILER_KEY = '@ViewBag.MapTilerApiKey';</script>
+<script src="~/js/storm-explorer.js"></script>
+</body>
+</html>

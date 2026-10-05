@@ -1,0 +1,26 @@
+# Build output
+bin/
+obj/
+
+# User-specific VS files
+.vs/
+*.user
+*.suo
+
+# ASP.NET Core secrets & local config
+appsettings.Development.json
+**/secrets.json
+
+# Runtime data — SQLite DB, auth keys, uploaded logos, MESH cache. Lives in
+# App_Data/ (not data/ — that collides case-insensitively with Data/, the
+# C# source folder, on Windows). Never commit any of it.
+App_Data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude dev tools — watcher output and scripts
+_build-output.json
+_tools/*.ps1
+_tools/*.md

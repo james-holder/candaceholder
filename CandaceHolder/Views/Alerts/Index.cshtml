@@ -1,0 +1,132 @@
+@{
+    ViewData["Title"] = "Storm Alerts";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Storm Alerts — StormLead Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="bg-navy text-slate-100 min-h-screen">
+
+<!-- ── Nav ─────────────────────────────────────────────────────────────── -->
+<header class="sticky top-0 z-50 bg-navy border-b border-slate-700/60 shadow-lg relative">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
+        <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center shadow">
+                <i class="fa-solid fa-house-chimney text-white text-sm"></i>
+            </div>
+            <span class="text-lg font-bold tracking-tight">
+                Storm<span class="text-brand">Lead</span> Pro
+            </span>
+        </div>
+        <nav class="hidden lg:flex items-center gap-6 text-sm text-slate-400">
+            <a href="/" class="hover:text-white transition-colors">Search</a>
+            <a href="/Leads/Saved" class="hover:text-white transition-colors">Saved Leads</a>
+            <a href="/Alerts" class="text-white font-semibold transition-colors">Alerts</a>
+            <a href="/Dashboard" class="hover:text-white transition-colors">Dashboard</a>
+            <span class="text-slate-600">|</span>
+            @await Html.PartialAsync("_AccountMenu")
+        </nav>
+        <button id="mobileMenuBtn" onclick="toggleMobileMenu()" class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors">
+            <i id="mobileMenuIcon" class="fa-solid fa-bars text-lg"></i>
+        </button>
+    </div>
+    <div id="mobileMenu" class="hidden lg:hidden absolute top-full left-0 right-0 bg-navy border-t border-slate-700/60 shadow-2xl z-50 px-4 py-3 flex flex-col gap-1">
+        <a href="/" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm"><i class="fa-solid fa-magnifying-glass w-4 text-center text-xs"></i>Search</a>
+        <a href="/Leads/Saved" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm"><i class="fa-solid fa-bookmark w-4 text-center text-xs"></i>Saved Leads</a>
+        <a href="/Alerts" class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-700/60 text-white font-semibold text-sm"><i class="fa-solid fa-bell w-4 text-center text-xs text-brand"></i>Alerts</a>
+        <a href="/Dashboard" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm"><i class="fa-solid fa-chart-bar w-4 text-center text-xs"></i>Dashboard</a>
+        <div class="border-t border-slate-700/60 my-1"></div>
+        @await Html.PartialAsync("_AccountMenuMobile")
+    </div>
+</header>
+
+<!-- ── Page ─────────────────────────────────────────────────────────────── -->
+<main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+
+    <!-- Header -->
+    <div class="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white mb-1">
+                <i class="fa-solid fa-bell text-brand mr-2"></i>Storm Alerts
+            </h1>
+            <p class="text-slate-400 text-sm">
+                Add the areas you work and we'll email you within 30 minutes when hail hits.
+                No leads required — the storm is your signal to go find them.
+            </p>
+        </div>
+        <button onclick="sendTestEmail()" id="testEmailBtn"
+            class="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 hover:text-white text-sm font-medium transition whitespace-nowrap shrink-0">
+            <i class="fa-solid fa-paper-plane text-xs"></i>
+            Send Test Email
+        </button>
+    </div>
+
+    <!-- Add area form -->
+    <div class="bg-navy-700 border border-slate-700/60 rounded-xl p-5 mb-6">
+        <h2 class="text-sm font-semibold text-slate-300 mb-4">
+            <i class="fa-solid fa-plus text-brand mr-1.5"></i>Watch a new area
+        </h2>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <input id="areaAddress" type="text" placeholder="City, zip code, or address (e.g. Dallas, TX)"
+                class="flex-1 bg-navy border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand transition" />
+            <div class="flex gap-2">
+                <select id="areaRadius" class="bg-navy border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-brand transition">
+                    <option value="5">5 mi</option>
+                    <option value="10" selected>10 mi</option>
+                    <option value="25">25 mi</option>
+                    <option value="50">50 mi</option>
+                </select>
+                <select id="areaMinHail" class="bg-navy border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-brand transition">
+                    <option value="0.75">Penny+ (0.75")</option>
+                    <option value="1.00" selected>Quarter+ (1.00")</option>
+                    <option value="1.25">Half Dollar+ (1.25")</option>
+                    <option value="1.50">Ping Pong+ (1.50")</option>
+                    <option value="1.75">Golf Ball+ (1.75")</option>
+                </select>
+                <button onclick="addArea()" id="addAreaBtn"
+                    class="px-4 py-2.5 rounded-lg bg-brand hover:bg-orange-600 text-white text-sm font-semibold transition flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Add Area</span>
+                </button>
+            </div>
+        </div>
+        <p id="addAreaError" class="hidden mt-2 text-xs text-red-400"></p>
+    </div>
+
+    <!-- Watched areas list -->
+    <div class="mb-8">
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Your Watch Areas</h2>
+        <div id="areasList">
+            <div class="text-slate-500 text-sm text-center py-8">
+                <i class="fa-solid fa-spinner fa-spin text-slate-600 text-xl mb-3 block"></i>
+                Loading…
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert history -->
+    <div>
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Recent Alerts Sent</h2>
+        <div id="historyList">
+            <div class="text-slate-500 text-sm text-center py-6">
+                <i class="fa-solid fa-spinner fa-spin text-slate-600 text-xl mb-3 block"></i>
+                Loading…
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<!-- ── Toast ─────────────────────────────────────────────────────────────── -->
+<div id="toast" class="fixed bottom-5 right-5 z-50 hidden px-4 py-3 rounded-xl text-sm font-medium shadow-xl border transition-all"></div>
+
+<script src="~/js/alerts-index.js" asp-append-version="true"></script>
+</body>
+</html>
