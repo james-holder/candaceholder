@@ -58,5 +58,5 @@ In Development a login is seeded on first run (see the console output).
 fly deploy
 ```
 
-The GitHub Actions workflow in `.github/workflows/deploy.yml` deploys every push to `master`
+The GitHub Actions workflow in `.github/workflows/deploy.yml` deploys every push to `main`
 once a `FLY_API_TOKEN` repo secret is set.
