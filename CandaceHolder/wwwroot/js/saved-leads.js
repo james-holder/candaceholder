@@ -1,21 +1,15 @@
-// saved-leads.js
+// saved-leads.js — Views/Leads/Saved.cshtml
 let allLeads      = [];
-let sortCol       = 'riskLevel';
-// riskOrder (see getSortValue) ranks High=0, Medium=1, Low=2, so 'asc' sorts
-// High -> Medium -> Low, i.e. Low sinks to the bottom of the list by default.
-let sortDir       = 'asc';
-let activeFilter  = 'all';
+let sortCol       = 'savedAt';
+let sortDir       = 'desc';
+let activeFilter  = 'all';        // 'all' | 'untraced' | 'traced'
 let activeTab     = 'pipeline';   // 'pipeline' | 'closed' | 'archived'
 let selectedIds   = new Set();
 let editingId      = null;
 let editingNotesId = null;
-let viewingContactsId  = null;
-let viewingStormHistoryId = null;
-let stormHistoryCache = {};   // id → {hail:[...], wind:[...]} or {error:'...'}
-let showWindIds = new Set();  // ids where wind panel is expanded
 let canEnrich     = false;   // set from /Leads/Stats — owners/managers only
 
-document.addEventListener('DOMContentLoaded', function() { loadLeads(); refreshTabCounts(); });
+document.addEventListener('DOMContentLoaded', function() { refreshTabCounts().then(loadLeads); });
 
 // ── Tab switching ─────────────────────────────────────────────────
 function switchLeadTab(tab) {
@@ -24,15 +18,13 @@ function switchLeadTab(tab) {
     activeFilter = 'all';
     editingId = null;
     editingNotesId = null;
-    viewingContactsId = null;
-    viewingStormHistoryId = null;
-    showWindIds.clear();
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
 
-    document.getElementById('tabPipeline').classList.toggle('lead-tab-active',  tab === 'pipeline');
-    document.getElementById('tabClosed').classList.toggle('lead-tab-active',    tab === 'closed');
-    document.getElementById('tabArchived').classList.toggle('lead-tab-active',   tab === 'archived');
+    document.getElementById('tabPipeline').classList.toggle('lead-tab-active', tab === 'pipeline');
+    document.getElementById('tabClosed').classList.toggle('lead-tab-active',   tab === 'closed');
+    document.getElementById('tabArchived').classList.toggle('lead-tab-active', tab === 'archived');
 
-    // Bulk toolbar & checkbox visibility - checkboxes on all active tabs, not archived
+    // Checkboxes and the bulk toolbar don't apply to archived leads
     document.getElementById('bulkToolbar').classList.add('hidden');
     var thCb = document.getElementById('thCheckbox');
     if (thCb) thCb.classList.toggle('hidden', tab === 'archived');
@@ -64,29 +56,20 @@ async function refreshTabCounts() {
         const r = await fetch('/Leads/Stats');
         if (!r.ok) return;
         const s = await r.json();
-        var uel = document.getElementById('tabUnenrichedCount');
-        var pel = document.getElementById('tabPipelineCount');
-        var cel = document.getElementById('tabClosedCount');
-        var ael = document.getElementById('tabArchivedCount');
-        if (uel) uel.textContent = s.unenrichedCount ?? '';
-        if (pel) pel.textContent = s.pipelineCount   ?? '';
-        if (cel) cel.textContent = s.closedCount     ?? '';
-        if (ael) ael.textContent = s.archivedCount   ?? '';
-        // Update role-gated flag so action buttons render correctly
+        document.getElementById('tabPipelineCount').textContent = s.pipelineCount ?? '';
+        document.getElementById('tabClosedCount').textContent   = s.closedCount   ?? '';
+        document.getElementById('tabArchivedCount').textContent = s.archivedCount ?? '';
+        // Role-gated flag so skip-trace buttons render correctly
         canEnrich = s.canEnrich === true;
     } catch {}
 }
 
 function updateTabCounts() {
-    var uel = document.getElementById('tabUnenrichedCount');
-    var pel = document.getElementById('tabPipelineCount');
-    var cel = document.getElementById('tabClosedCount');
-    if (activeTab === 'unenriched' && uel) uel.textContent = allLeads.length;
-    if (activeTab === 'pipeline'   && pel) pel.textContent = allLeads.length;
-    if (activeTab === 'closed'     && cel) cel.textContent = allLeads.length;
-    const cnt = allLeads.length;
+    var counts = { pipeline: 'tabPipelineCount', closed: 'tabClosedCount', archived: 'tabArchivedCount' };
+    var el = document.getElementById(counts[activeTab]);
+    if (el) el.textContent = allLeads.length;
     var hero = document.getElementById('heroCount');
-    if (hero) hero.textContent = cnt ? '(' + cnt + ')' : '';
+    if (hero) hero.textContent = allLeads.length ? '(' + allLeads.length + ')' : '';
 }
 
 // ── Filter bar ────────────────────────────────────────────────────
@@ -94,6 +77,12 @@ function setFilter(f) {
     activeFilter = f;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
     renderTable();
+}
+
+function matchesFilter(lead) {
+    if (activeFilter === 'traced')   return lead.isEnriched;
+    if (activeFilter === 'untraced') return !lead.isEnriched;
+    return true;
 }
 
 // ── Sort ──────────────────────────────────────────────────────────
@@ -104,19 +93,15 @@ function sortBy(col) {
 }
 
 function getSortValue(lead, col) {
-    const riskOrder = { High:0, Medium:1, Low:2 };
     const statusOrder = { new:0, contacted:1, appointment_set:2, closed_won:3, closed_lost:4 };
     switch (col) {
-        case 'address':       return (lead.address      || '').toLowerCase();
-        case 'riskLevel':     return riskOrder[lead.riskLevel] != null ? riskOrder[lead.riskLevel] : 3;
-        case 'hailSize':      return parseFloat(lead.hailSize) || 0;
-        case 'lastStormDate': return lead.lastStormDate || '';
-        case 'yearBuilt':     return lead.yearBuilt     || 0;
-        case 'ownerName':     return (lead.ownerName    || '').toLowerCase();
-        case 'ownerPhone':    return (lead.ownerPhone   || '').toLowerCase();
-        case 'ownerEmail':    return (lead.ownerEmail   || '').toLowerCase();
-        case 'status':        return statusOrder[lead.status] != null ? statusOrder[lead.status] : 5;
-        default:              return '';
+        case 'address':    return (lead.address    || '').toLowerCase();
+        case 'ownerName':  return (lead.ownerName  || '').toLowerCase();
+        case 'ownerPhone': return (lead.ownerPhone || '').toLowerCase();
+        case 'ownerEmail': return (lead.ownerEmail || '').toLowerCase();
+        case 'status':     return statusOrder[lead.status] != null ? statusOrder[lead.status] : 5;
+        case 'savedAt':    return lead.savedAt || '';
+        default:           return '';
     }
 }
 
@@ -154,11 +139,7 @@ function updateSelectAllState() {
 function applyRowHighlight(id, on) {
     var row = document.querySelector('tr[data-lead-id="' + id + '"]');
     if (!row) return;
-    if (on) {
-        row.classList.add('row-selected', 'bg-orange-500/5', 'border-l-2', 'border-orange-500');
-    } else {
-        row.classList.remove('row-selected', 'bg-orange-500/5', 'border-l-2', 'border-orange-500');
-    }
+    ['row-selected', 'bg-orange-500/5', 'border-l-2', 'border-orange-500'].forEach(function(c) { row.classList.toggle(c, on); });
 }
 
 function clearSelection() {
@@ -172,6 +153,10 @@ function clearSelection() {
     updateBulkToolbar();
 }
 
+function selectedUntracedIds() {
+    return allLeads.filter(function(l) { return selectedIds.has(l.id) && !l.isEnriched; }).map(function(l) { return l.id; });
+}
+
 function updateBulkToolbar() {
     var toolbar = document.getElementById('bulkToolbar');
     if (!toolbar) return;
@@ -179,24 +164,27 @@ function updateBulkToolbar() {
     toolbar.classList.toggle('hidden', !show);
     if (!show) return;
 
-    var countEl  = document.getElementById('selectedCount');
-    var pluralEl = document.getElementById('selectedCountPlural');
-    if (countEl)  countEl.textContent  = selectedIds.size;
-    if (pluralEl) pluralEl.textContent = selectedIds.size === 1 ? '' : 's';
+    document.getElementById('selectedCount').textContent       = selectedIds.size;
+    document.getElementById('selectedCountPlural').textContent = selectedIds.size === 1 ? '' : 's';
 
-    // Enrich button only makes sense on the unenriched tab
+    // Skip trace only applies to selected leads that haven't been traced yet
     var enrichBtn = document.getElementById('btnBulkEnrich');
-    if (enrichBtn) enrichBtn.classList.toggle('hidden', activeTab !== 'unenriched');
+    var untraced  = selectedUntracedIds().length;
+    enrichBtn.classList.toggle('hidden', !canEnrich || untraced === 0);
+    enrichBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-dollar"></i>Skip Trace ' + untraced;
 }
 
 // ── Bulk actions ──────────────────────────────────────────────────
 async function bulkEnrich() {
-    if (selectedIds.size === 0) return;
-    var ids  = Array.from(selectedIds);
+    var ids = selectedUntracedIds();
+    if (ids.length === 0) return;
+    if (!confirm('Skip trace ' + ids.length + ' address' + (ids.length === 1 ? '' : 'es') + '?\n\n' +
+                 'Each lookup is billed by your skip-tracing provider.')) return;
+
     var btn  = document.getElementById('btnBulkEnrich');
     var orig = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Enriching ' + ids.length + '...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Tracing ' + ids.length + '…';
     try {
         var resp = await fetch('/Leads/BulkEnrich', {
             method: 'POST',
@@ -207,54 +195,27 @@ async function bulkEnrich() {
         var r;
         try { r = JSON.parse(body); } catch { throw new Error('Server error - check logs'); }
         if (!resp.ok) throw new Error(r.error || 'HTTP ' + resp.status);
-        var enriched = (r.results || []).filter(function(x) { return x.result && x.result.status === 'completed'; }).length;
-        showToast('Enriched ' + enriched + ' of ' + ids.length + ' leads', enriched > 0);
+        var found = (r.results || []).filter(function(x) { return x.result && x.result.status === 'completed'; }).length;
+        showToast('Found data for ' + found + ' of ' + r.processed + ' address' + (r.processed === 1 ? '' : 'es'), found > 0);
         selectedIds.clear();
         updateBulkToolbar();
-        await refreshTabCounts();
         await loadLeads();
     } catch (e) {
-        showToast('Bulk enrich failed: ' + e.message, false);
+        showToast('Skip trace failed: ' + e.message, false);
     } finally {
         btn.disabled = false;
         btn.innerHTML = orig;
     }
 }
 
-async function bulkArchive() {
-    if (selectedIds.size === 0) return;
-    var ids = Array.from(selectedIds);
-    if (!confirm('Archive ' + ids.length + ' lead(s)? They will be removed from this list.')) return;
-    var btn  = document.getElementById('btnBulkArchive');
-    var orig = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Archiving...'; }
-    try {
-        var resp = await fetch('/Leads/BulkArchive', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: ids })
-        });
-        var r = await resp.json();
-        if (!resp.ok) throw new Error(r.error || 'HTTP ' + resp.status);
-        showToast('Archived ' + r.archived + ' lead(s)', true);
-        selectedIds.clear();
-        updateBulkToolbar();
-        await refreshTabCounts();
-        await loadLeads();
-    } catch (e) {
-        showToast('Archive failed: ' + e.message, false);
-    } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = orig; }
-    }
-}
-
 async function bulkDelete() {
     if (selectedIds.size === 0) return;
     var ids = Array.from(selectedIds);
-    if (!confirm('Delete ' + ids.length + ' lead(s)? They will be moved to the Archived tab.')) return;
+    if (!confirm('Archive ' + ids.length + ' lead(s)? You can restore them from the Archived tab.')) return;
     var btn  = document.getElementById('btnBulkDelete');
-    var orig = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Deleting...'; }
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Archiving…';
     try {
         var resp = await fetch('/Leads/BulkDelete', {
             method: 'POST',
@@ -265,18 +226,18 @@ async function bulkDelete() {
         var r;
         try { r = JSON.parse(body); } catch (_) { throw new Error('Server error - check logs'); }
         if (!resp.ok) throw new Error(r.error || 'HTTP ' + resp.status);
-        // Remove deleted leads from the in-memory list so the table updates instantly
         allLeads = allLeads.filter(function(l) { return !selectedIds.has(l.id); });
         selectedIds.clear();
         updateTabCounts();
         renderTable();
         updateBulkToolbar();
-        showToast('Deleted ' + (r.archived || 0) + ' lead(s)', true);
+        showToast('Archived ' + (r.archived || 0) + ' lead(s)', true);
         refreshTabCounts();
     } catch (e) {
-        showToast('Delete failed: ' + e.message, false);
+        showToast('Archive failed: ' + e.message, false);
     } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+        btn.disabled = false;
+        btn.innerHTML = orig;
     }
 }
 
@@ -292,42 +253,41 @@ function renderTable() {
     setLoading(false);
     const query = (document.getElementById('searchInput').value || '').toLowerCase();
     let rows = allLeads
-        .filter(l => activeFilter === 'all' || l.riskLevel === activeFilter)
+        .filter(matchesFilter)
         .filter(l => !query || [l.address, l.ownerName, l.ownerPhone, l.ownerEmail].some(v => (v||'').toLowerCase().includes(query)));
 
     rows = rows.sort((a, b) => {
         const av = getSortValue(a, sortCol), bv = getSortValue(b, sortCol);
-        const cmp = typeof av === 'number' ? av - bv : av.localeCompare(bv, undefined, { sensitivity:'base' });
+        const cmp = typeof av === 'number' ? av - bv : av.localeCompare(bv, undefined, { sensitivity:'base', numeric:true });
         return sortDir === 'asc' ? cmp : -cmp;
     });
 
-    document.getElementById('fAll').textContent    = allLeads.length;
-    document.getElementById('fHigh').textContent   = allLeads.filter(l => l.riskLevel === 'High').length;
-    document.getElementById('fMedium').textContent = allLeads.filter(l => l.riskLevel === 'Medium').length;
-    document.getElementById('fLow').textContent    = allLeads.filter(l => l.riskLevel === 'Low').length;
+    document.getElementById('fAll').textContent      = allLeads.length;
+    document.getElementById('fUntraced').textContent = allLeads.filter(l => !l.isEnriched).length;
+    document.getElementById('fTraced').textContent   = allLeads.filter(l => l.isEnriched).length;
 
-    const body   = document.getElementById('leadsBody');
-    const cards  = document.getElementById('mobileCards');
-    const empty  = document.getElementById('leadsEmpty');
-    const noMatch= document.getElementById('leadsNoMatch');
+    const body    = document.getElementById('leadsBody');
+    const cards   = document.getElementById('mobileCards');
+    const empty   = document.getElementById('leadsEmpty');
+    const noMatch = document.getElementById('leadsNoMatch');
     empty.classList.add('hidden');
     noMatch.classList.add('hidden');
 
     if (allLeads.length === 0) {
         body.innerHTML = '';
-        if (cards) cards.innerHTML = '';
+        cards.innerHTML = '';
         empty.classList.remove('hidden');
         return;
     }
     if (rows.length === 0) {
         body.innerHTML = '';
-        if (cards) cards.innerHTML = '';
+        cards.innerHTML = '';
         noMatch.classList.remove('hidden');
         return;
     }
 
-    body.innerHTML = rows.map(l => buildRow(l)).join('');
-    if (cards) cards.innerHTML = rows.map(l => buildMobileCard(l)).join('');
+    body.innerHTML  = rows.map(l => buildRow(l)).join('');
+    cards.innerHTML = rows.map(l => buildMobileCard(l)).join('');
 
     document.querySelectorAll('.row-checkbox').forEach(function(cb) {
         cb.checked = selectedIds.has(parseInt(cb.dataset.id));
@@ -370,18 +330,12 @@ async function setStatus(id, value) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: value })
         });
-        if (resp.status === 402) { window.location.href = '/Billing/Upgrade'; return; }
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        var lead = allLeads.find(function(l) { return l.id === id; });
-        if (lead) lead.status = value;
 
-        var pipelineStatuses = ['new', 'contacted', 'appointment_set'];
-        var closedStatuses   = ['closed_won', 'closed_lost'];
-        var leavesTab = (activeTab === 'unenriched' && !['new', null].includes(value)) ||
-                        (activeTab === 'pipeline'   && !pipelineStatuses.includes(value)) ||
-                        (activeTab === 'closed'     && !closedStatuses.includes(value));
-
-        var dest = closedStatuses.includes(value) ? 'Closed' : pipelineStatuses.includes(value) ? 'Pipeline' : 'New Leads';
+        var closedStatuses = ['closed_won', 'closed_lost'];
+        var leavesTab = (activeTab === 'pipeline' && closedStatuses.includes(value)) ||
+                        (activeTab === 'closed'   && !closedStatuses.includes(value));
+        var dest = closedStatuses.includes(value) ? 'Closed' : 'Active';
         showToast(leavesTab ? 'Status updated — moved to ' + dest : 'Status updated', true);
         await loadLeads();
         refreshTabCounts();
@@ -391,17 +345,9 @@ async function setStatus(id, value) {
     }
 }
 
-// ── Contacts panel helpers ────────────────────────────────────────
-function toggleContacts(id) {
-    editingNotesId = null;
-    viewingContactsId = (viewingContactsId === id) ? null : id;
-    renderTable();
-}
-
 // ── Notes helpers ─────────────────────────────────────────────────
 function openNotes(id) {
     editingId = null;
-    viewingContactsId = null;
     editingNotesId = id;
     renderTable();
 }
@@ -429,69 +375,55 @@ async function saveNotes(id) {
 }
 
 // ── Row builder ───────────────────────────────────────────────────
+const iconBtn = 'w-7 h-7 rounded-lg flex items-center justify-center border transition';
+
 function buildRow(lead) {
-    const rc  = ({ High:'badge-high', Medium:'badge-medium', Low:'badge-low' }[lead.riskLevel]) || 'badge-low';
-    const ed  = editingId === lead.id;
+    const ed = editingId === lead.id;
 
     const cbCell = activeTab !== 'archived'
         ? '<td class="w-8"><input type="checkbox" class="row-checkbox accent-orange-500 w-4 h-4 cursor-pointer" data-id="' + lead.id + '" onchange="toggleRowSelect(this)" /></td>'
         : '';
 
     const hasNotes = !!(lead.notes && lead.notes.trim());
-    const notesBtnCls = hasNotes
-        ? 'w-7 h-7 rounded-lg flex items-center justify-center bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 transition'
-        : 'w-7 h-7 rounded-lg flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-slate-400 border border-slate-600 transition';
-    const notesBtn = '<button onclick="openNotes(' + lead.id + ')" class="' + notesBtnCls + '" title="' + (hasNotes ? escapeAttr(lead.notes.slice(0,80)) : 'Add notes') + '"><i class="fa-solid fa-note-sticky text-xs"></i></button>';
+    const notesBtn = '<button onclick="openNotes(' + lead.id + ')" class="' + iconBtn + ' ' +
+        (hasNotes ? 'bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 border-amber-500/30' : 'bg-slate-700 hover:bg-slate-600 text-slate-400 border-slate-600') +
+        '" title="' + (hasNotes ? escapeAttr(lead.notes.slice(0,80)) : 'Add notes') + '"><i class="fa-solid fa-note-sticky text-xs"></i></button>';
 
-    // Pencil button toggles the edit expansion row; highlights when active
-    const penCls = ed
-        ? 'w-7 h-7 rounded-lg flex items-center justify-center bg-brand/20 text-brand border border-brand/40 transition'
-        : 'w-7 h-7 rounded-lg flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-brand border border-slate-600 transition';
-    const penBtn = '<button onclick="' + (ed ? 'cancelEdit()' : 'startEdit(' + lead.id + ')') + '" class="' + penCls + '" title="' + (ed ? 'Cancel edit' : 'Edit contact') + '"><i class="fa-solid fa-pen text-xs"></i></button>';
+    const penBtn = '<button onclick="' + (ed ? 'cancelEdit()' : 'startEdit(' + lead.id + ')') + '" class="' + iconBtn + ' ' +
+        (ed ? 'bg-brand/20 text-brand border-brand/40' : 'bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-brand border-slate-600') +
+        '" title="' + (ed ? 'Cancel edit' : 'Edit owner info') + '"><i class="fa-solid fa-pen text-xs"></i></button>';
 
-    // Storm history button — highlights when accordion is open
-    const stormHistOpen = viewingStormHistoryId === lead.id;
-    const stormBtnCls = stormHistOpen
-        ? 'w-7 h-7 rounded-lg flex items-center justify-center bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 transition'
-        : 'w-7 h-7 rounded-lg flex items-center justify-center bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-cyan-400 border border-slate-600 transition';
-    const stormBtn = lead.lat
-        ? '<button onclick="toggleStormHistory(' + lead.id + ')" class="' + stormBtnCls + '" title="Storm history (5 years)"><i class="fa-solid fa-cloud-bolt text-xs"></i></button>'
-        : '';
+    const openBtn = '<a href="/Leads/' + lead.id + '" class="' + iconBtn + ' bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white border-slate-600" title="Open lead"><i class="fa-solid fa-up-right-from-square text-xs"></i></a>';
+
+    const traceBtn = !lead.isEnriched && canEnrich
+        ? '<button onclick="enrichLead(' + lead.id + ', this)" class="' + iconBtn + ' bg-orange-500/10 hover:bg-orange-500/30 text-orange-400 border-orange-500/20" title="Skip trace"><i class="fa-solid fa-magnifying-glass-dollar text-xs"></i></button>'
+        : lead.isEnriched
+            ? '<span class="w-7 h-7 flex items-center justify-center" title="Skip traced"><i class="fa-solid fa-circle-check text-xs text-green-500"></i></span>'
+            : '';
 
     let ac;
-    if (activeTab === 'unenriched') {
-        const enrichBtn = canEnrich
-            ? '<button onclick="enrichLead(' + lead.id + ', this)" class="w-7 h-7 rounded-lg flex items-center justify-center bg-orange-500/10 hover:bg-orange-500/30 text-orange-400 border border-orange-500/20 transition" title="Enrich"><i class="fa-solid fa-bolt text-xs"></i></button>'
-            : '';
-        ac = '<div class="flex items-center justify-center gap-1">' +
-             enrichBtn + penBtn + notesBtn + stormBtn +
-             '<button onclick="archiveLead(' + lead.id + ', this)" class="w-7 h-7 rounded-lg flex items-center justify-center bg-slate-600/40 hover:bg-slate-600 text-slate-400 border border-slate-600 transition" title="Archive"><i class="fa-solid fa-box-archive text-xs"></i></button></div>';
-    } else if (activeTab === 'pipeline' || activeTab === 'closed') {
-        ac = '<div class="flex items-center justify-center gap-1">' +
-             '<button onclick="downloadReport(' + lead.id + ', this)" class="w-7 h-7 rounded-lg flex items-center justify-center bg-sky-500/10 hover:bg-sky-500/30 text-sky-400 border border-sky-500/20 transition" title="Download hail report PDF"><i class="fa-solid fa-file-pdf text-xs"></i></button>' +
-             penBtn + notesBtn + stormBtn +
-             '<span class="w-7 h-7 flex items-center justify-center" title="Enriched leads are protected"><i class="fa-solid fa-shield-halved text-xs text-slate-600"></i></span></div>';
+    if (activeTab === 'archived') {
+        ac = '<button onclick="restoreLead(' + lead.id + ', this)" class="' + iconBtn + ' bg-green-500/10 hover:bg-green-500/30 text-green-400 border-green-500/20" title="Restore"><i class="fa-solid fa-rotate-left text-xs"></i></button>' +
+             notesBtn + openBtn;
     } else {
-        ac = '<div class="flex items-center justify-center gap-1">' +
-             '<button onclick="restoreLead(' + lead.id + ', this)" class="w-7 h-7 rounded-lg flex items-center justify-center bg-green-500/10 hover:bg-green-500/30 text-green-400 border border-green-500/20 transition" title="Restore to active"><i class="fa-solid fa-rotate-left text-xs"></i></button>' +
-             notesBtn + stormBtn + '</div>';
+        ac = traceBtn + penBtn + notesBtn + openBtn;
     }
+    ac = '<div class="flex items-center justify-center gap-1">' + ac + '</div>';
 
     const statusCell = activeTab !== 'archived'
-        ? '<td class="hidden md:table-cell">' + buildStatusDropdown(lead) + '</td>'
-        : '<td class="hidden md:table-cell"><span class="text-xs text-slate-600 italic">archived</span></td>';
+        ? '<td>' + buildStatusDropdown(lead) + '</td>'
+        : '<td><span class="text-xs text-slate-600 italic">archived</span></td>';
 
-    // Edit contact — expands a row below (pencil icon toggles it)
     const editExpRow = ed
         ? '<tr class="notes-row" data-edit-for="' + lead.id + '">' +
           '<td colspan="7" class="notes-row-cell">' +
           '<div class="flex items-center gap-2">' +
-          '<span class="text-xs font-semibold text-slate-400 uppercase tracking-wide shrink-0"><i class="fa-solid fa-user mr-1.5"></i>Contact</span>' +
+          '<span class="text-xs font-semibold text-slate-400 uppercase tracking-wide shrink-0"><i class="fa-solid fa-user mr-1.5"></i>Owner</span>' +
           '<input class="owner-input flex-1" id="eName_' + lead.id + '" value="' + escapeAttr(lead.ownerName || '') + '" placeholder="Owner name..." />' +
           '<input class="owner-input flex-1" id="ePhone_' + lead.id + '" value="' + escapeAttr(lead.ownerPhone || '') + '" placeholder="(555) 000-0000" />' +
           '<input class="owner-input flex-1" id="eEmail_' + lead.id + '" value="' + escapeAttr(lead.ownerEmail || '') + '" placeholder="owner@example.com" />' +
-          '<button onclick="saveOwner(' + lead.id + ')" class="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-green-500/20 hover:bg-green-500/40 text-green-400 border border-green-500/30 transition" title="Save"><i class="fa-solid fa-check text-xs"></i></button>' +
-          '<button onclick="cancelEdit()" class="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-slate-600/40 hover:bg-slate-600 text-slate-400 border border-slate-600 transition" title="Cancel"><i class="fa-solid fa-xmark text-xs"></i></button>' +
+          '<button onclick="saveOwner(' + lead.id + ')" class="flex-shrink-0 ' + iconBtn + ' bg-green-500/20 hover:bg-green-500/40 text-green-400 border-green-500/30" title="Save"><i class="fa-solid fa-check text-xs"></i></button>' +
+          '<button onclick="cancelEdit()" class="flex-shrink-0 ' + iconBtn + ' bg-slate-600/40 hover:bg-slate-600 text-slate-400 border-slate-600" title="Cancel"><i class="fa-solid fa-xmark text-xs"></i></button>' +
           '</div></td></tr>'
         : '';
 
@@ -503,33 +435,32 @@ function buildRow(lead) {
           'onkeydown="if(event.key===\'Escape\'){closeNotes();}else if((event.metaKey||event.ctrlKey)&&event.key===\'Enter\'){saveNotes(' + lead.id + ');}">' +
           escapeHtml(lead.notes || '') +
           '</textarea>' +
-          '<button onclick="saveNotes(' + lead.id + ')" class="flex-shrink-0 mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center bg-green-500/20 hover:bg-green-500/40 text-green-400 border border-green-500/30 transition" title="Save (Ctrl+Enter)"><i class="fa-solid fa-check text-xs"></i></button>' +
-          '<button onclick="closeNotes()" class="flex-shrink-0 mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center bg-slate-600/40 hover:bg-slate-600 text-slate-400 border border-slate-600 transition" title="Cancel (Esc)"><i class="fa-solid fa-xmark text-xs"></i></button>' +
+          '<button onclick="saveNotes(' + lead.id + ')" class="flex-shrink-0 mt-0.5 ' + iconBtn + ' bg-green-500/20 hover:bg-green-500/40 text-green-400 border-green-500/30" title="Save (Ctrl+Enter)"><i class="fa-solid fa-check text-xs"></i></button>' +
+          '<button onclick="closeNotes()" class="flex-shrink-0 mt-0.5 ' + iconBtn + ' bg-slate-600/40 hover:bg-slate-600 text-slate-400 border-slate-600" title="Cancel (Esc)"><i class="fa-solid fa-xmark text-xs"></i></button>' +
           '</div></td></tr>'
         : '';
 
-    // Hail cell with size comparison label
-    var hailCell = (function() {
-        var hl = hailLabel(lead.hailSize);
-        return hl
-            ? escapeHtml(lead.hailSize) + '<br><span class="text-xs ' + hl.cls + '">' + hl.label + '</span>'
-            : escapeHtml(lead.hailSize);
-    })();
+    const extraContacts = (lead.contacts || []).length > 1
+        ? '<span class="block text-xs text-slate-500">+' + (lead.contacts.length - 1) + ' more contact' + (lead.contacts.length > 2 ? 's' : '') + '</span>'
+        : '';
+    const phoneCell = lead.ownerPhone
+        ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="text-green-400 hover:text-green-300 whitespace-nowrap">' + escapeHtml(lead.ownerPhone) + '</a>' + extraContacts
+        : '<span class="text-slate-600">—</span>';
+    const emailCell = lead.ownerEmail
+        ? '<a href="mailto:' + escapeAttr(lead.ownerEmail) + '" class="text-indigo-300 hover:text-indigo-200 truncate block" style="max-width:200px">' + escapeHtml(lead.ownerEmail) + '</a>'
+        : '<span class="text-slate-600">—</span>';
 
     const rowSelectedCls = selectedIds.has(lead.id) ? ' row-selected bg-orange-500/5 border-l-2 border-orange-500' : '';
     return '<tr data-lead-id="' + lead.id + '" class="' + (ed ? 'editing' : '') + rowSelectedCls + '">' +
         cbCell +
-        '<td class="font-medium text-white" style="max-width:200px"><span class="block truncate" title="' + escapeAttr(lead.address) + '">' + escapeHtml(lead.address) + '</span>' +
+        '<td class="font-medium text-white" style="max-width:240px"><span class="block truncate" title="' + escapeAttr(lead.address) + '">' + escapeHtml(lead.address) + '</span>' +
         (lead.sourceAddress ? '<span class="block text-xs text-slate-500 truncate">from ' + escapeHtml(lead.sourceAddress) + '</span>' : '') + '</td>' +
-        '<td><span class="' + rc + ' px-2 py-0.5 rounded-full text-xs font-bold">' + escapeHtml(lead.riskLevel) + '</span></td>' +
-        '<td class="hidden md:table-cell">' + hailCell + '</td>' +
-        '<td class="hidden md:table-cell whitespace-nowrap">' +
-            escapeHtml(lead.lastStormDate || '') +
-            (lead.lastStormDate ? '<br>' + buildClaimBadge(lead.lastStormDate, lead.address) : '') +
-        '</td>' +
+        '<td>' + (lead.ownerName ? escapeHtml(lead.ownerName) : '<span class="text-slate-600">—</span>') + '</td>' +
+        '<td>' + phoneCell + '</td>' +
+        '<td class="hidden lg:table-cell">' + emailCell + '</td>' +
         statusCell +
         '<td class="sticky-actions">' + ac + '</td></tr>' +
-        editExpRow + notesExpRow + buildStormHistoryExpRow(lead);
+        editExpRow + notesExpRow;
 }
 
 // ── Row actions ───────────────────────────────────────────────────
@@ -565,52 +496,6 @@ async function restoreLead(id, btn) {
     }
 }
 
-async function archiveLead(id, btn) {
-    if (!confirm('Archive this lead? It will be removed from the active list.')) return;
-    btn.disabled = true;
-    try {
-        var resp = await fetch('/Leads/BulkArchive', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids:[id] }) });
-        if (!resp.ok) { var r = await resp.json(); throw new Error(r.error || 'HTTP ' + resp.status); }
-        allLeads = allLeads.filter(function(l) { return l.id !== id; });
-        selectedIds.delete(id);
-        updateTabCounts(); renderTable(); showToast('Lead archived', true);
-        refreshTabCounts();
-    } catch (e) { btn.disabled = false; showToast('Archive failed: ' + e.message, false); }
-}
-
-function getFilenameFromResponse(resp) {
-    var header = resp.headers.get('content-disposition');
-    if (!header) return null;
-    var match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header);
-    return match ? decodeURIComponent(match[1]) : null;
-}
-
-async function downloadReport(id, btn) {
-    const icon = btn.querySelector('i');
-    const origClass = icon ? icon.className : '';
-    btn.disabled = true;
-    if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-xs';
-    try {
-        const resp = await fetch('/Leads/' + id + '/Report');
-        if (resp.status === 402) { window.location.href = '/Billing/Upgrade'; return; }
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        const blob = await resp.blob();
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = getFilenameFromResponse(resp) || ('HailReport-' + id + '.pdf');
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    } catch (e) {
-        showToast('Report failed: ' + e.message, false);
-    } finally {
-        btn.disabled = false;
-        if (icon) icon.className = origClass;
-    }
-}
-
 async function enrichLead(id, btn) {
     btn.disabled = true;
     var origHtml = btn.innerHTML;
@@ -621,70 +506,47 @@ async function enrichLead(id, btn) {
         if (!resp.ok) throw new Error(r.error || 'HTTP ' + resp.status);
 
         if (r.status === 'completed') {
-            allLeads = allLeads.filter(function(l) { return l.id !== id; });
-            selectedIds.delete(id);
-            var contactCount = (r.contacts && r.contacts.length) ? r.contacts.length : 0;
-            var contactBit = contactCount > 1 ? contactCount + ' contacts' : (r.ownerPhone || r.ownerEmail ? '1 contact' : null);
-            var found = [r.ownerName, r.yearBuilt ? 'built ' + r.yearBuilt : null, contactBit].filter(Boolean).join(' · ');
-            showToast(found ? 'Found: ' + found : 'Parcel found - no additional data', true);
-            updateTabCounts(); renderTable(); refreshTabCounts();
+            var found = [r.ownerName, r.ownerPhone, r.ownerEmail].filter(Boolean).join(' · ');
+            showToast(found ? 'Found: ' + found : 'Traced — no contact details found', !!found);
         } else {
-            showToast('No parcel data found for this address', false);
-            btn.disabled = false; btn.innerHTML = origHtml;
+            showToast('No data found for this address', false);
         }
+        await loadLeads();
     } catch (e) {
-        showToast('Enrichment failed: ' + e.message, false);
+        showToast('Skip trace failed: ' + e.message, false);
         btn.disabled = false; btn.innerHTML = origHtml;
     }
 }
 
 // ── Export ────────────────────────────────────────────────────────
+// One row per contact (so multiple phones/emails from a skip trace all
+// come through), falling back to the lead's owner fields.
 function exportCSV(leadsOverride) {
-    var header = ['Address','Risk Level','Hail Size','Last Storm Date','Year Built',
-                  'Contact Name','Phone','Email','Contact Type','Is Primary',
-                  'Status','Notes','Source Address','Saved At'];
+    var header = ['Address','Owner / Contact Name','Phone','Email','Contact Type','Is Primary',
+                  'Year Built','Traced','Status','Notes','Source','Saved At'];
 
-    function q(v) { return '"' + (v || '').toString().replace(/"/g,'""') + '"'; }
+    function q(v) { return '"' + (v == null ? '' : v).toString().replace(/"/g,'""') + '"'; }
 
     var rows     = [header.join(',')];
     var srcLeads = Array.isArray(leadsOverride) ? leadsOverride : allLeads;
 
     srcLeads.forEach(function(l) {
-        var base = [q(l.address), q(l.riskLevel), q(l.hailSize), q(l.lastStormDate), q(l.yearBuilt)];
-        var tail = [q(l.status), q(l.notes), q(l.sourceAddress), q(l.savedAt)];
+        var tail = [q(l.yearBuilt), q(l.isEnriched ? 'Yes' : 'No'), q(l.status), q(l.notes), q(l.sourceAddress), q(l.savedAt)];
         var contacts = (l.contacts && l.contacts.length > 0) ? l.contacts : null;
         if (contacts) {
             contacts.forEach(function(c) {
-                rows.push(base.concat([q(c.name), q(c.phone), q(c.email), q(c.contactType), q(c.isPrimary ? 'Yes' : 'No')]).concat(tail).join(','));
+                rows.push([q(l.address), q(c.name), q(c.phone), q(c.email), q(c.contactType), q(c.isPrimary ? 'Yes' : 'No')].concat(tail).join(','));
             });
         } else {
-            rows.push(base.concat([q(l.ownerName), q(l.ownerPhone), q(l.ownerEmail), q('owner'), q('Yes')]).concat(tail).join(','));
+            rows.push([q(l.address), q(l.ownerName), q(l.ownerPhone), q(l.ownerEmail), q('owner'), q('Yes')].concat(tail).join(','));
         }
     });
 
     var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([rows.join('\n')], { type:'text/csv' }));
-    a.download = 'StormLeads_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.href = URL.createObjectURL(new Blob([rows.join('\r\n')], { type:'text/csv' }));
+    a.download = 'Leads_' + new Date().toISOString().slice(0,10) + '.csv';
     a.click();
-}
-
-// ── Hail size helper ──────────────────────────────────────────────
-function hailLabel(raw) {
-    var n = parseFloat(raw);
-    if (isNaN(n) || n <= 0) return null;
-    var ref;
-    if      (n < 0.75) ref = { label: 'Pea',        cls: 'text-yellow-500' };
-    else if (n < 0.88) ref = { label: 'Penny',       cls: 'text-yellow-400' };
-    else if (n < 1.00) ref = { label: 'Nickel',      cls: 'text-yellow-400' };
-    else if (n < 1.25) ref = { label: 'Quarter',     cls: 'text-orange-400' };
-    else if (n < 1.50) ref = { label: 'Half Dollar', cls: 'text-orange-400' };
-    else if (n < 1.75) ref = { label: 'Ping Pong',   cls: 'text-orange-500' };
-    else if (n < 2.00) ref = { label: 'Golf Ball',   cls: 'text-red-400'    };
-    else if (n < 2.50) ref = { label: 'Hen Egg',     cls: 'text-red-400'    };
-    else if (n < 2.75) ref = { label: 'Tennis Ball', cls: 'text-red-500'    };
-    else if (n < 4.00) ref = { label: 'Baseball',    cls: 'text-red-500'    };
-    else               ref = { label: 'Softball',    cls: 'text-red-600'    };
-    return ref;
+    URL.revokeObjectURL(a.href);
 }
 
 // ── Utility ───────────────────────────────────────────────────────
@@ -692,8 +554,7 @@ function setLoading(on) {
     document.getElementById('leadsLoading').classList.toggle('hidden', !on);
     if (on) {
         document.getElementById('leadsBody').innerHTML = '';
-        var cards = document.getElementById('mobileCards');
-        if (cards) cards.innerHTML = '';
+        document.getElementById('mobileCards').innerHTML = '';
     }
 }
 
@@ -705,8 +566,7 @@ function escapeAttr(s) { return escapeHtml(s); }
 
 // ── Mobile card view ──────────────────────────────────────────────
 function buildMobileCard(lead) {
-    const rc = ({ High:'badge-high', Medium:'badge-medium', Low:'badge-low' }[lead.riskLevel]) || 'badge-low';
-    const ed = editingId === lead.id;
+    const ed     = editingId === lead.id;
     const enotes = editingNotesId === lead.id;
 
     if (ed) {
@@ -727,30 +587,21 @@ function buildMobileCard(lead) {
         ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/15 border border-green-500/30 text-green-400 text-sm font-semibold active:bg-green-500/30 transition"><i class="fa-solid fa-phone"></i>' + escapeHtml(lead.ownerPhone) + '</a>'
         : '<span class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-700/40 border border-slate-600/60 text-slate-500 text-sm"><i class="fa-solid fa-phone-slash"></i>No phone yet</span>';
 
-    const hailBit = (lead.hailSize && lead.hailSize !== 'No data') ? (function() {
-        var hl = hailLabel(lead.hailSize);
-        return '<span><i class="fa-solid fa-cloud-bolt mr-1 text-orange-400"></i>' + escapeHtml(lead.hailSize) +
-               (hl ? ' <span class="' + hl.cls + '">(' + hl.label + ')</span>' : '') + '</span>';
-    })() : '';
-    const dateBit = (lead.lastStormDate && lead.lastStormDate !== 'No data')
-        ? '<span><i class="fa-solid fa-calendar mr-1 text-slate-500"></i>' + escapeHtml(lead.lastStormDate) + ' ' + buildClaimBadge(lead.lastStormDate, lead.address) + '</span>'
-        : '';
-    const yearBit = lead.yearBuilt ? '<span><i class="fa-solid fa-house mr-1 text-slate-500"></i>Built ' + lead.yearBuilt + '</span>' : '';
+    const tracedBadge = lead.isEnriched
+        ? '<span class="text-xs text-green-400 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>Traced</span>'
+        : '<span class="text-xs text-slate-500">Not traced</span>';
 
-    const enrichedBadge = lead.isEnriched ? '<span class="text-xs text-green-400 font-semibold"><i class="fa-solid fa-check-circle mr-1"></i>Enriched</span>' : '';
-
-    const reportBtn = '<button onclick="downloadReport(' + lead.id + ', this)" class="py-2 px-3.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold hover:bg-sky-500/20 transition" title="Download hail report PDF"><i class="fa-solid fa-file-pdf"></i></button>';
-    const actionBtns = activeTab === 'unenriched'
-        ? (canEnrich ? '<button onclick="enrichLead(' + lead.id + ', this)" class="flex-1 py-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-semibold hover:bg-orange-500/20 active:bg-orange-500/30 transition"><i class="fa-solid fa-bolt mr-1"></i>Enrich</button>' : '') +
+    const actionBtns = activeTab === 'archived'
+        ? '<button onclick="restoreLead(' + lead.id + ', this)" class="flex-1 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-semibold hover:bg-green-500/20 transition"><i class="fa-solid fa-rotate-left mr-1"></i>Restore</button>'
+        : (!lead.isEnriched && canEnrich
+              ? '<button onclick="enrichLead(' + lead.id + ', this)" class="flex-1 py-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-semibold hover:bg-orange-500/20 active:bg-orange-500/30 transition"><i class="fa-solid fa-magnifying-glass-dollar mr-1"></i>Skip Trace</button>'
+              : '') +
           '<button onclick="startEdit(' + lead.id + ')" class="flex-1 py-2 rounded-xl bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-pen mr-1"></i>Edit</button>' +
-          '<button onclick="archiveLead(' + lead.id + ', this)" class="py-2 px-3.5 rounded-xl bg-slate-600/40 border border-slate-600 text-slate-400 text-xs font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-box-archive"></i></button>'
-        : (activeTab === 'pipeline' || activeTab === 'closed')
-        ? reportBtn + '<button onclick="startEdit(' + lead.id + ')" class="flex-1 py-2 rounded-xl bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-pen mr-1"></i>Edit</button>'
-        : '<button onclick="restoreLead(' + lead.id + ', this)" class="flex-1 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-semibold hover:bg-green-500/20 transition"><i class="fa-solid fa-rotate-left mr-1"></i>Restore</button>';
+          '<a href="/Leads/' + lead.id + '" class="py-2 px-3.5 rounded-xl bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-up-right-from-square"></i></a>';
 
     const statusRow = activeTab !== 'archived'
         ? '<div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700/60">' +
-          '<span class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Pipeline</span>' +
+          '<span class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Status</span>' +
           buildStatusDropdown(lead) +
           '</div>'
         : '';
@@ -758,7 +609,7 @@ function buildMobileCard(lead) {
     const hasNotes = !!(lead.notes && lead.notes.trim());
     const notesSection = enotes
         ? '<div class="mt-3 pt-3 border-t border-slate-700/60 space-y-2">' +
-          '<textarea id="notesArea_' + lead.id + '" class="notes-textarea w-full" rows="3" placeholder="Add notes about this lead"></textarea>' +
+          '<textarea id="notesArea_' + lead.id + '" class="notes-textarea w-full" rows="3" placeholder="Add notes about this lead">' + escapeHtml(lead.notes || '') + '</textarea>' +
           '<div class="flex gap-2">' +
           '<button onclick="saveNotes(' + lead.id + ')" class="flex-1 py-2 rounded-xl bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-semibold hover:bg-green-500/30 transition"><i class="fa-solid fa-check mr-1"></i>Save Note</button>' +
           '<button onclick="closeNotes()" class="py-2 px-3.5 rounded-xl bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-xmark"></i></button>' +
@@ -769,220 +620,23 @@ function buildMobileCard(lead) {
           '<i class="fa-solid fa-note-sticky mr-1.5"></i>' + (hasNotes ? 'Edit Note' : 'Add Note') + '</button>' +
           '</div>';
 
-    // Storm history section for mobile card
-    const mobileStormHistOpen = viewingStormHistoryId === lead.id;
-    const mobileStormBtnCls = mobileStormHistOpen
-        ? 'w-full py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition'
-        : 'w-full py-2 rounded-xl bg-slate-700/60 border border-slate-600/60 text-slate-400 text-xs font-semibold hover:bg-slate-700 transition';
-
-    var mobileStormSection = lead.lat
-        ? '<div class="mt-2 pt-2 border-t border-slate-700/60">' +
-          '<button onclick="toggleStormHistory(' + lead.id + ')" class="' + mobileStormBtnCls + '">' +
-          '<i class="fa-solid fa-cloud-bolt mr-1.5"></i>' + (mobileStormHistOpen ? 'Hide Storm History' : 'Storm History (5 yrs)') + '</button>' +
-          (mobileStormHistOpen ? buildMobileStormHistoryPanel(lead.id) : '') +
-          '</div>'
+    const cb = activeTab !== 'archived'
+        ? '<input type="checkbox" class="row-checkbox accent-orange-500 w-4 h-4 mt-0.5 cursor-pointer" data-id="' + lead.id + '" onchange="toggleRowSelect(this)" />'
         : '';
 
-    var cardHtml = '<div class="bg-slate-800 border border-slate-700/60 rounded-2xl p-4 shadow-md" data-lead-id="' + lead.id + '">' +
-        '<div class="flex items-start justify-between gap-2 mb-1">' +
+    return '<div class="bg-slate-800 border border-slate-700/60 rounded-2xl p-4 shadow-md" data-lead-id="' + lead.id + '">' +
+        '<div class="flex items-start justify-between gap-2 mb-3">' +
+        cb +
         '<div class="flex-1 min-w-0">' +
         '<p class="font-semibold text-white text-sm leading-tight">' + escapeHtml(lead.address) + '</p>' +
         (lead.ownerName ? '<p class="text-xs text-slate-400 mt-0.5"><i class="fa-solid fa-user mr-1"></i>' + escapeHtml(lead.ownerName) + '</p>' : '') +
         '</div>' +
-        '<div class="flex flex-col items-end gap-1">' +
-        '<span class="' + rc + ' px-2.5 py-0.5 rounded-full text-xs font-bold">' + escapeHtml(lead.riskLevel) + '</span>' +
-        enrichedBadge +
-        '</div></div>' +
-        ((hailBit || dateBit || yearBit) ? '<div class="flex items-center gap-3 text-xs text-slate-400 mb-3 mt-2 flex-wrap">' + hailBit + dateBit + yearBit + '</div>' : '<div class="mb-3"></div>') +
+        tracedBadge +
+        '</div>' +
         '<div class="flex gap-2 mb-3">' + phoneHtml + '</div>' +
         '<div class="flex items-center gap-2">' + actionBtns + '</div>' +
-        statusRow + notesSection + mobileStormSection +
+        statusRow + notesSection +
         '</div>';
-    return cardHtml;
-}
-
-// ── Storm history helpers ─────────────────────────────────────────
-function toggleWindForLead(id) {
-    if (showWindIds.has(id)) showWindIds.delete(id); else showWindIds.add(id);
-    renderTable();
-}
-
-function buildMobileStormHistoryPanel(id) {
-    var cached = stormHistoryCache[id];
-    if (!cached) {
-        return '<div class="mt-2 flex items-center gap-2 text-slate-400 text-xs py-1">' +
-               '<i class="fa-solid fa-spinner fa-spin text-cyan-400"></i><span>Loading…</span></div>';
-    }
-    if (cached.error) {
-        return '<p class="mt-2 text-red-400 text-xs"><i class="fa-solid fa-triangle-exclamation mr-1"></i>' + escapeHtml(cached.error) + '</p>';
-    }
-    var hail = (cached.hail || []);
-    var wind = (cached.wind || []);
-    var showWind = showWindIds.has(id);
-
-    if (hail.length === 0 && wind.length === 0) {
-        return '<p class="mt-2 text-slate-500 text-xs italic">No storm events within 10 miles.</p>';
-    }
-
-    var hailRows = hail.slice(0, 20).map(function(e) {
-        var hl = hailLabel(e.sizeInches);
-        var sizeRef = hl ? ' <span class="' + hl.cls + '">(' + hl.label + ')</span>' : '';
-        return '<div class="flex items-center gap-2 py-1 border-b border-slate-700/40 last:border-0 text-xs">' +
-               '<i class="fa-solid fa-cloud-bolt text-orange-400 w-3 shrink-0"></i>' +
-               '<span class="w-20 shrink-0 text-slate-300 font-mono">' + escapeHtml(e.date) + '</span>' +
-               '<span class="text-orange-400 font-semibold">' + e.sizeInches.toFixed(2) + '"' + sizeRef + '</span>' +
-               '<span class="text-slate-500 ml-auto shrink-0">' + (e.miles != null ? e.miles.toFixed(1) + ' mi' : '') + '</span>' +
-               '</div>';
-    }).join('');
-
-    var windRows = showWind ? wind.slice(0, 20).map(function(w) {
-        return '<div class="flex items-center gap-2 py-1 border-b border-slate-700/40 last:border-0 text-xs">' +
-               '<i class="fa-solid fa-wind text-sky-400 w-3 shrink-0"></i>' +
-               '<span class="w-20 shrink-0 text-slate-300 font-mono">' + escapeHtml(w.date) + '</span>' +
-               '<span class="text-sky-400 font-semibold">' + w.windMph + ' mph</span>' +
-               '<span class="text-slate-500 ml-auto shrink-0">' + (w.miles != null ? w.miles.toFixed(1) + ' mi' : '') + '</span>' +
-               '</div>';
-    }).join('') : '';
-
-    var windBtn = wind.length > 0
-        ? '<button onclick="toggleWindForLead(' + id + ')" class="mt-2 text-xs px-2 py-1 rounded-lg border ' +
-          (showWind ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' : 'bg-slate-700 text-slate-400 border-slate-600') +
-          '">' + (showWind ? 'Hide wind' : 'Show wind (' + wind.length + ')') + '</button>'
-        : '';
-
-    return '<div class="mt-2">' + hailRows + windRows + windBtn + '</div>';
-}
-
-// ── Storm history accordion ───────────────────────────────────────
-async function toggleStormHistory(id) {
-    if (viewingStormHistoryId === id) {
-        viewingStormHistoryId = null;
-        renderTable();
-        return;
-    }
-    viewingStormHistoryId = id;
-    renderTable(); // show loading spinner immediately
-
-    if (!stormHistoryCache[id]) {
-        var lead = allLeads.find(function(l) { return l.id === id; });
-        if (!lead) return;
-
-        // Try to parse a 2-letter US state code from the address string
-        var stateMatch = (lead.address || '').match(/\b([A-Z]{2})\b\s*\d{5}/);
-        var state = stateMatch ? stateMatch[1] : '';
-
-        var url = '/RoofHealth/StormHistory?lat=' + lead.lat + '&lng=' + lead.lng;
-        if (state) url += '&state=' + encodeURIComponent(state);
-
-        try {
-            var resp = await fetch(url);
-            if (!resp.ok) throw new Error('HTTP ' + resp.status);
-            stormHistoryCache[id] = await resp.json();
-        } catch (e) {
-            stormHistoryCache[id] = { error: e.message };
-        }
-        renderTable(); // re-render with loaded data
-    }
-}
-
-function buildStormHistoryExpRow(lead) {
-    if (viewingStormHistoryId !== lead.id) return '';
-
-    var innerHtml = '';
-    var cached = stormHistoryCache[lead.id];
-    var closeBtn = '<button onclick="toggleStormHistory(' + lead.id + ')" class="text-xs text-slate-500 hover:text-slate-300 transition" title="Close"><i class="fa-solid fa-xmark"></i></button>';
-
-    if (!cached) {
-        innerHtml = '<div class="flex items-center gap-2 text-slate-400 text-sm py-1">' +
-                    '<i class="fa-solid fa-spinner fa-spin text-cyan-400 text-xs"></i>' +
-                    '<span>Loading storm history…</span></div>';
-    } else if (cached.error) {
-        innerHtml = '<div class="flex items-center justify-between">' +
-                    '<span class="text-red-400 text-xs"><i class="fa-solid fa-triangle-exclamation mr-1.5"></i>Failed to load: ' + escapeHtml(cached.error) + '</span>' + closeBtn + '</div>';
-    } else {
-        var hail = cached.hail || [];
-        var wind = cached.wind || [];
-        var showWind = showWindIds.has(lead.id);
-
-        // ── Header bar ─────────────────────────────────────────────────
-        var hailLabel2 = hail.length + ' hail event' + (hail.length !== 1 ? 's' : '') + ' (5 yr)';
-        var windToggleBtn = wind.length > 0
-            ? '<button onclick="toggleWindForLead(' + lead.id + ')" class="px-2 py-0.5 rounded-lg text-xs border transition ' +
-              (showWind ? 'bg-sky-500/20 text-sky-300 border-sky-500/30 hover:bg-sky-500/30'
-                        : 'bg-slate-700 text-slate-400 border-slate-600 hover:bg-slate-600 hover:text-sky-400') + '">' +
-              '<i class="fa-solid fa-wind mr-1"></i>' + (showWind ? 'Hide wind' : 'Wind (' + wind.length + ')') +
-              '</button>'
-            : '';
-
-        var headerBar = '<div class="flex items-center justify-between mb-2 gap-2">' +
-                        '<div class="flex items-center gap-2">' +
-                        '<span class="text-xs font-semibold text-cyan-400 uppercase tracking-wide">' +
-                        '<i class="fa-solid fa-cloud-bolt mr-1.5"></i>' + hailLabel2 + '</span>' +
-                        windToggleBtn + '</div>' + closeBtn + '</div>';
-
-        if (hail.length === 0 && !showWind) {
-            innerHtml = headerBar +
-                        '<p class="text-slate-500 text-xs italic"><i class="fa-solid fa-cloud-sun mr-1"></i>' +
-                        'No hail events found within 10 miles in the last 5 years.' +
-                        (wind.length > 0 ? ' Wind data available — click Wind to view.' : '') + '</p>';
-        } else {
-            var srcBadge = function(src) {
-                return src === 'lsr'
-                    ? '<span class="px-1.5 py-0.5 rounded text-xs bg-green-500/15 text-green-400 border border-green-500/20">LSR</span>'
-                    : src === 'tomorrow'
-                    ? '<span class="px-1.5 py-0.5 rounded text-xs bg-violet-500/15 text-violet-400 border border-violet-500/20">Tomorrow.io</span>'
-                    : src === 'lsr-wind'
-                    ? '<span class="px-1.5 py-0.5 rounded text-xs bg-sky-500/15 text-sky-400 border border-sky-500/20">LSR</span>'
-                    : '<span class="px-1.5 py-0.5 rounded text-xs bg-slate-700 text-slate-400 border border-slate-600">NOAA</span>';
-            };
-
-            // ── Stats summary bar ──────────────────────────────────────────
-            var peakHail  = hail.length > 0 ? Math.max.apply(null, hail.map(function(e){ return e.sizeInches; })) : null;
-            var peakWind  = wind.length > 0 ? Math.max.apply(null, wind.map(function(w){ return w.windMph; })) : null;
-            var statsBar  = '<div class="flex flex-wrap gap-3 mb-3 mt-1">';
-            statsBar += '<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-xs">' +
-                        '<i class="fa-solid fa-cloud-bolt text-orange-400"></i>' +
-                        '<span class="text-slate-400">Events:</span> <span class="text-orange-300 font-bold">' + hail.length + '</span></div>';
-            if (peakHail !== null) {
-                statsBar += '<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-xs">' +
-                            '<i class="fa-solid fa-ruler text-orange-400"></i>' +
-                            '<span class="text-slate-400">Peak hail:</span> <span class="text-orange-300 font-bold">' + peakHail.toFixed(2) + '"</span></div>';
-            }
-            if (peakWind !== null) {
-                statsBar += '<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-xs">' +
-                            '<i class="fa-solid fa-wind text-sky-400"></i>' +
-                            '<span class="text-slate-400">Peak wind:</span> <span class="text-sky-300 font-bold">' + peakWind + ' mph</span></div>';
-            }
-            statsBar += '</div>';
-
-            var hailRows = hail.map(function(e) {
-                var hl = hailLabel(e.sizeInches);
-                var sizeRef = hl ? ' <span class="' + hl.cls + ' text-xs">(' + hl.label + ')</span>' : '';
-                return '<div class="flex items-center gap-3 py-1.5 border-b border-slate-700/40 last:border-0">' +
-                       '<i class="fa-solid fa-cloud-bolt text-orange-400 text-xs w-3 shrink-0"></i>' +
-                       '<span class="w-24 shrink-0 text-slate-300 font-mono text-xs">' + escapeHtml(e.date) + '</span>' +
-                       '<span class="w-28 shrink-0 text-orange-400 font-semibold text-xs">' + e.sizeInches.toFixed(2) + '"' + sizeRef + '</span>' +
-                       srcBadge(e.source) +
-                       '<span class="text-slate-500 text-xs ml-auto shrink-0">' + (e.miles != null ? e.miles.toFixed(1) + ' mi' : '') + '</span>' +
-                       '</div>';
-            }).join('');
-
-            var windRows = showWind ? wind.map(function(w) {
-                return '<div class="flex items-center gap-3 py-1.5 border-b border-slate-700/40 last:border-0">' +
-                       '<i class="fa-solid fa-wind text-sky-400 text-xs w-3 shrink-0"></i>' +
-                       '<span class="w-24 shrink-0 text-slate-300 font-mono text-xs">' + escapeHtml(w.date) + '</span>' +
-                       '<span class="w-28 shrink-0 text-sky-400 font-semibold text-xs">' + w.windMph + ' mph gusts</span>' +
-                       srcBadge(w.source) +
-                       '<span class="text-slate-500 text-xs ml-auto shrink-0">' + (w.miles != null ? w.miles.toFixed(1) + ' mi' : '') + '</span>' +
-                       '</div>';
-            }).join('') : '';
-
-            innerHtml = headerBar + statsBar + hailRows + windRows;
-        }
-    }
-
-    return '<tr class="notes-row" data-storm-history-for="' + lead.id + '">' +
-           '<td colspan="7" class="notes-row-cell">' + innerHtml + '</td></tr>';
 }
 
 // ── Mobile nav ────────────────────────────────────────────────────

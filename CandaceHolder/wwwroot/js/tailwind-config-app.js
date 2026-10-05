@@ -9,10 +9,8 @@
 // <script src="https://cdn.tailwindcss.com"> tag and BEFORE Tailwind scans the page —
 // same position the inline block used to occupy in each view's <head>.
 //
-// NOT used by Views/Home/Landing.cshtml or Views/Help/Index.cshtml — those two also set a
-// custom `fontFamily` (Inter) and have their own slightly different color sets, so they keep
-// their own dedicated config files (tailwind-config-landing.js / tailwind-config-help.js)
-// rather than being folded in here, to avoid changing their typography.
+// NOT used by Views/Help/Index.cshtml — it sets a custom `fontFamily` (Inter) and its own
+// color set, so it keeps a dedicated config file (tailwind-config-help.js).
 tailwind.config = {
     theme: {
         extend: {

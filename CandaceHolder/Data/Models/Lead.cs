@@ -6,11 +6,6 @@ namespace CandaceHolder.Data.Models
         public string  Address         { get; set; } = "";
         public double? Lat             { get; set; }
         public double? Lng             { get; set; }
-        public string? RiskLevel       { get; set; }
-        public string? LastStormDate   { get; set; }
-        public string? HailSize        { get; set; }
-        public string? EstimatedDamage { get; set; }
-        public int?    RoofAge         { get; set; }  // legacy — no longer populated from scans
         public int?    YearBuilt       { get; set; }  // from Regrid parcel data
         public string? PropertyType    { get; set; }
         public string? SourceAddress   { get; set; }

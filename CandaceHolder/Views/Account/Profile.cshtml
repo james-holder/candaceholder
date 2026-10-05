@@ -3,14 +3,13 @@
 @{
     Layout = null;
     var isAdmin = ViewBag.IsAdmin is true;
-    var alertsEnabled = Configuration.GetValue<bool>("FeatureFlags:AlertsEnabled");
 }
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Profile — StormLead Pro</title>
+    <title>My Profile — Candace Holder</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
@@ -18,27 +17,20 @@
 </head>
 <body class="min-h-screen">
 
-@await Html.PartialAsync("_TrialBanner")
 
 <!-- Header -->
 <header class="sticky top-0 z-50 bg-[#0f172a] border-b border-slate-700/60 shadow-lg relative">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
         <a href="/" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
             <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center shadow">
-                <i class="fa-solid fa-house-chimney text-white text-sm"></i>
+                <i class="fa-solid fa-address-book text-white text-sm"></i>
             </div>
-            <span class="text-lg font-extrabold tracking-tight">Storm<span class="text-brand">Lead</span> Pro</span>
+            <span class="text-lg font-extrabold tracking-tight">Candace <span class="text-brand">Holder</span></span>
         </a>
         <nav class="hidden lg:flex items-center gap-6 text-sm text-slate-400">
             <a href="/" class="hover:text-white transition-colors">Search</a>
             <a href="/Leads/Saved" class="hover:text-white transition-colors">Saved Leads</a>
             <a href="/Dashboard" class="hover:text-white transition-colors">Dashboard</a>
-            @if (alertsEnabled)
-            {
-                <a href="/Alerts" class="hover:text-white transition-colors">
-                    <i class="fa-solid fa-bell mr-1 text-xs"></i>Alerts
-                </a>
-            }
             <a href="/Help" class="hover:text-white transition-colors">
                 <i class="fa-solid fa-circle-question mr-1 text-xs"></i>Help
             </a>
@@ -69,12 +61,6 @@
         <a href="/Dashboard" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
             <i class="fa-solid fa-chart-bar w-4 text-center text-xs"></i>Dashboard
         </a>
-        @if (alertsEnabled)
-        {
-            <a href="/Alerts" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
-                <i class="fa-solid fa-bell w-4 text-center text-xs"></i>Alerts
-            </a>
-        }
         <a href="/Help" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
             <i class="fa-solid fa-circle-question w-4 text-center text-xs"></i>Help
         </a>
@@ -163,7 +149,7 @@
                                placeholder="alerts@example.com"
                                class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-600 text-white text-sm placeholder-slate-500
                                       focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition" />
-                        <p class="text-xs text-slate-500 mt-1.5">Where storm/hail alerts are sent, if different from your login email.</p>
+                        <p class="text-xs text-slate-500 mt-1.5">Where notifications are sent, if different from your login email.</p>
                     </div>
 
                 </div>
@@ -188,9 +174,9 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
         <div class="flex items-center gap-2">
             <div class="w-5 h-5 bg-brand/80 rounded flex items-center justify-center">
-                <i class="fa-solid fa-house-chimney text-white text-xs"></i>
+                <i class="fa-solid fa-address-book text-white text-xs"></i>
             </div>
-            <span>StormLead Pro &copy; 2026</span>
+            <span>Candace Holder &copy; 2026</span>
         </div>
         <a href="/Dashboard" class="text-brand hover:text-orange-300 transition-colors text-xs">Back to dashboard &rarr;</a>
     </div>

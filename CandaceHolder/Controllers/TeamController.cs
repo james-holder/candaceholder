@@ -62,7 +62,6 @@ namespace CandaceHolder.Controllers
             if (org == null) return RedirectToAction("Index", "Dashboard");
 
             ViewBag.OrgName    = org.Name;
-            ViewBag.OrgPlan    = org.Plan;
             ViewBag.OrgRole    = CurrentOrgRole;
             ViewBag.IsOwner    = CurrentOrgRole == "owner";
             ViewBag.CanManage  = IsOwnerOrManager;
@@ -176,14 +175,14 @@ namespace CandaceHolder.Controllers
                   <div style='max-width:520px;margin:32px auto;background:#1e293b;border-radius:12px;overflow:hidden;border:1px solid #334155'>
                     <div style='background:#f97316;padding:20px 28px'>
                       <h1 style='margin:0;color:#fff;font-size:20px;font-weight:700'>⚡ Team Invitation</h1>
-                      <p style='margin:4px 0 0;color:#fff3e0;font-size:13px'>StormLead Pro</p>
+                      <p style='margin:4px 0 0;color:#fff3e0;font-size:13px'>Candace Holder</p>
                     </div>
                     <div style='padding:28px'>
                       <p style='color:#cbd5e1;font-size:15px;margin:0 0 20px'>
                         <strong style='color:#f1f5f9'>{System.Net.WebUtility.HtmlEncode(inviterName)}</strong>
                         has invited you to join
                         <strong style='color:#f1f5f9'>{System.Net.WebUtility.HtmlEncode(org.Name)}</strong>
-                        on StormLead Pro as a <strong style='color:#f97316'>{roleName}</strong>.
+                        on Candace Holder as a <strong style='color:#f97316'>{roleName}</strong>.
                       </p>
                       <a href='{acceptUrl}'
                          style='display:inline-block;background:#f97316;color:#fff;font-weight:700;
@@ -203,7 +202,7 @@ namespace CandaceHolder.Controllers
             {
                 var sent = await _email.SendAsync(
                     req.Email,
-                    $"You've been invited to join {org.Name} on StormLead Pro",
+                    $"You've been invited to join {org.Name} on Candace Holder",
                     html);
                 if (!sent)
                     _logger.LogWarning("TeamController: invite email failed to deliver to {Email}", req.Email);

@@ -50,7 +50,7 @@ namespace CandaceHolder.Services
                 var username    = _config["Email:Username"] ?? "";
                 var password    = _config["Email:Password"] ?? "";
                 var fromAddress = _config["Email:FromAddress"]!;
-                var fromName    = _config["Email:FromName"] ?? "StormLead Pro";
+                var fromName    = _config["Email:FromName"] ?? "Candace Holder";
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(fromName, fromAddress));
@@ -132,7 +132,7 @@ namespace CandaceHolder.Services
                 var username    = _config["Email:Username"] ?? "";
                 var password    = _config["Email:Password"] ?? "";
                 var fromAddress = _config["Email:FromAddress"]!;
-                var fromName    = _config["Email:FromName"] ?? "StormLead Pro";
+                var fromName    = _config["Email:FromName"] ?? "Candace Holder";
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(fromName, fromAddress));

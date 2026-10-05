@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using System.IO;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CandaceHolder.Data;
@@ -7,7 +6,6 @@ using CandaceHolder.Data.Models;
 using CandaceHolder.Services;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 
 namespace CandaceHolder.Controllers
 {
@@ -17,21 +15,15 @@ namespace CandaceHolder.Controllers
     {
         private readonly AppDbContext        _db;
         private readonly IWebHostEnvironment _env;
-        private readonly HailReportService   _reports;
         private readonly RealDataService     _realData;
-        private readonly MeshSwathService    _mesh;
         private readonly IConfiguration      _config;
-        private readonly ReportCreditService _reportCredits;
 
-        public LeadsController(AppDbContext db, IWebHostEnvironment env, HailReportService reports, RealDataService realData, MeshSwathService mesh, IConfiguration config, ReportCreditService reportCredits)
+        public LeadsController(AppDbContext db, IWebHostEnvironment env, RealDataService realData, IConfiguration config)
         {
             _db       = db;
             _env      = env;
-            _reports  = reports;
             _realData = realData;
-            _mesh     = mesh;
             _config   = config;
-            _reportCredits = reportCredits;
         }
 
         private long? CurrentUserId =>
@@ -43,9 +35,25 @@ namespace CandaceHolder.Controllers
         private string CurrentOrgRole =>
             User.FindFirst("user_org_role")?.Value ?? "rep";
 
-        private bool CanEnrich =>
-            _config.GetValue<bool>("FeatureFlags:EnrichmentEnabled")
-            && CurrentOrgRole is "owner" or "manager";
+        // Skip tracing costs money per lookup, so only owners/managers can run it.
+        private bool CanEnrich => CurrentOrgRole is "owner" or "manager";
+
+        // True when at least one skip-trace provider has a key. Without one, a
+        // "trace" would just mark leads traced with nothing found.
+        private bool HasSkipTraceProvider =>
+            !string.IsNullOrWhiteSpace(_config["Regrid:Token"]) ||
+            !string.IsNullOrWhiteSpace(_config["WhitepagesPro:ApiKey"]) ||
+            !string.IsNullOrWhiteSpace(_config["BatchSkipTracing:ApiKey"]);
+
+        private const string NoProviderError =
+            "No skip-trace provider is set up. Add a Regrid, Whitepages Pro, or BatchSkipTracing key.";
+
+        // Loads a lead only if it belongs to the caller's org.
+        private Task<Lead?> FindOwnLeadAsync(long id)
+        {
+            var orgId = CurrentOrgId;
+            return _db.Leads.FirstOrDefaultAsync(l => l.Id == id && (l.OrgId == orgId || l.OrgId == null));
+        }
 
         // ── GET /Leads/Saved → HTML page ────────────────────────────
         [HttpGet("Saved")]
@@ -70,8 +78,6 @@ namespace CandaceHolder.Controllers
         }
 
         // ── GET /Leads?tab=pipeline|closed|archived ──────────────────
-        // "New Leads" tab retired — new/unstarted leads now live in the pipeline
-        // (enrichment is disabled, so there's no pre-pipeline step anymore).
         [HttpGet]
         public async Task<IActionResult> Index(string tab = "pipeline")
         {
@@ -99,13 +105,11 @@ namespace CandaceHolder.Controllers
             }
 
             var leads = await query
-                .OrderBy(l => l.RiskLevel == "High" ? 0 : l.RiskLevel == "Medium" ? 1 : 2)
-                .ThenByDescending(l => l.SavedAt)
+                .OrderByDescending(l => l.SavedAt)
                 .Select(l => new
                 {
                     l.Id, l.Address, l.Lat, l.Lng,
-                    l.RiskLevel, l.LastStormDate, l.HailSize,
-                    l.EstimatedDamage, l.PropertyType,
+                    l.PropertyType,
                     l.SourceAddress, l.SavedAt, l.Notes,
                     l.OwnerName, l.OwnerPhone, l.OwnerEmail,
                     l.YearBuilt, l.IsEnriched, l.Status,
@@ -134,23 +138,17 @@ namespace CandaceHolder.Controllers
             {
                 if (string.IsNullOrWhiteSpace(p.Address)) continue;
 
-                var existing = await _db.Leads.FirstOrDefaultAsync(l => l.Address == p.Address);
+                var existing = await _db.Leads.FirstOrDefaultAsync(l => l.Address == p.Address && l.OrgId == orgId);
                 if (existing != null)
                 {
                     // Restore if previously archived
                     existing.DeletedAt       = null;
                     existing.Lat             = p.Lat;
                     existing.Lng             = p.Lng;
-                    existing.RiskLevel       = p.RiskLevel;
-                    existing.LastStormDate   = p.LastStormDate;
-                    existing.HailSize        = p.HailSize;
-                    existing.EstimatedDamage = p.EstimatedDamage;
-                    existing.RoofAge         = p.RoofAge;
                     existing.PropertyType    = p.PropertyType;
                     existing.SourceAddress   = req.SourceAddress;
                     existing.SavedAt         = DateTime.UtcNow;
                     existing.UserId          = userId;
-                    existing.OrgId           = orgId;
                     updated++;
                 }
                 else
@@ -160,11 +158,6 @@ namespace CandaceHolder.Controllers
                         Address         = p.Address,
                         Lat             = p.Lat,
                         Lng             = p.Lng,
-                        RiskLevel       = p.RiskLevel,
-                        LastStormDate   = p.LastStormDate,
-                        HailSize        = p.HailSize,
-                        EstimatedDamage = p.EstimatedDamage,
-                        RoofAge         = p.RoofAge,
                         PropertyType    = p.PropertyType,
                         SourceAddress   = req.SourceAddress,
                         SavedAt         = DateTime.UtcNow,
@@ -183,7 +176,7 @@ namespace CandaceHolder.Controllers
         [HttpPatch("{id:long}/Owner")]
         public async Task<IActionResult> UpdateOwner(long id, [FromBody] OwnerDto dto)
         {
-            var lead = await _db.Leads.FindAsync(id);
+            var lead = await FindOwnLeadAsync(id);
             if (lead == null) return NotFound();
 
             lead.OwnerName  = dto.OwnerName;
@@ -198,261 +191,37 @@ namespace CandaceHolder.Controllers
         [HttpPost("{id:long}/Enrich")]
         public async Task<IActionResult> Enrich(long id)
         {
-            if (!_config.GetValue<bool>("FeatureFlags:EnrichmentEnabled"))
-                return StatusCode(503, new { error = "Enrichment is currently disabled." });
             if (!CanEnrich)
-                return StatusCode(403, new { error = "Reps cannot run enrichment. Ask an owner or manager." });
+                return StatusCode(403, new { error = "Reps cannot run skip tracing. Ask an owner or manager." });
 
-            var orgId = CurrentOrgId;
-            var credit = orgId.HasValue
-                ? await _db.OrgCredits.FirstOrDefaultAsync(c => c.OrgId == orgId && c.CreditType == "enrichment")
-                : null;
-            if (credit != null && credit.Balance <= 0)
-                return StatusCode(402, new { error = "No enrichment credits remaining. Top up your plan to continue." });
+            if (!HasSkipTraceProvider)
+                return StatusCode(503, new { error = NoProviderError });
 
-            var lead = await _db.Leads.FindAsync(id);
+            var lead = await FindOwnLeadAsync(id);
             if (lead == null) return NotFound(new { error = "Lead not found." });
 
-            return Json(await EnrichLeadAsync(lead, credit));
-        }
-
-        // ── GET /Leads/{id}/Report — download hail damage PDF ────────
-        // Gated on report-credit balance behind FeatureFlags:ReportCreditsEnabled
-        // (see ReportCreditService, docs/pricing-refresh-punchlist.md). The flag
-        // is OFF by default so this stays unlimited/unchanged until existing
-        // orgs have a starting balance and Stripe checkout exists for orgs that
-        // run out — flip it on only after both are true.
-        [HttpGet("{id:long}/Report")]
-        public async Task<IActionResult> Report(long id)
-        {
-            var orgId = CurrentOrgId;
-            var lead  = await _db.Leads
-                .FirstOrDefaultAsync(l => l.Id == id &&
-                    (l.OrgId == orgId || l.OrgId == null) &&
-                    l.DeletedAt == null);
-
-            if (lead == null) return NotFound();
-
-            var reportCreditsEnabled = _config.GetValue<bool>("FeatureFlags:ReportCreditsEnabled");
-            var isUnlimitedPlan = false;
-            if (reportCreditsEnabled && orgId.HasValue)
-            {
-                var creditOrg = await _db.Orgs.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orgId.Value);
-                isUnlimitedPlan = PricingCatalog.IsUnlimitedPlan(creditOrg?.Plan);
-                if (!isUnlimitedPlan)
-                {
-                    var balance = await _reportCredits.GetBalanceAsync(orgId.Value);
-                    if (balance <= 0)
-                        return StatusCode(402, new { error = "No report credits remaining. Upgrade your plan or buy more reports to continue." });
-                }
-            }
-
-            // Fetch storm history when we have coordinates
-            List<RealDataService.HailEvent>? hailHistory = null;
-            List<RealDataService.WindEvent>?  windHistory = null;
-
-            if (lead.Lat.HasValue && lead.Lng.HasValue)
-            {
-                var lat = lead.Lat.Value;
-                var lng = lead.Lng.Value;
-
-                // Auto-detect state for LSR queries
-                var stateAbbr = "";
-                if (!string.IsNullOrWhiteSpace(lead.Address))
-                {
-                    var m = System.Text.RegularExpressions.Regex.Match(
-                        lead.Address, @"\b([A-Z]{2})\b\s*\d{5}");
-                    if (m.Success) stateAbbr = m.Groups[1].Value;
-                }
-                if (stateAbbr.Length != 2)
-                    stateAbbr = await _realData.GetStateFromLatLngAsync(lat, lng);
-
-                const double fetch   = 10.0;
-                // Widened from 2 mi to match storm history — rural reports log at the
-                // nearest town, so 2 mi hid real storms. Report shows each event's distance.
-                const double display = 10.0;
-                var fiveYearsAgo = DateTime.UtcNow.AddYears(-5);
-                var oneYearAgo   = DateTime.UtcNow.AddYears(-1);
-
-                var swdiTask   = _realData.GetSwdiHailEventsAsync(lat, lng, fetch);
-                var lsrTask    = string.IsNullOrWhiteSpace(stateAbbr)
-                    ? Task.FromResult(new List<RealDataService.HailEvent>())
-                    : _realData.GetMesonetLsrHailAsync(lat, lng, fetch, stateAbbr);
-                var seTask     = string.IsNullOrWhiteSpace(stateAbbr)
-                    ? Task.FromResult(new List<RealDataService.HailEvent>())
-                    : _realData.GetStormEventsHailAsync(lat, lng, fetch, stateAbbr);
-                var windTask   = string.IsNullOrWhiteSpace(stateAbbr)
-                    ? Task.FromResult(new List<RealDataService.WindEvent>())
-                    : _realData.GetMesonetLsrWindAsync(lat, lng, fetch, stateAbbr, lookbackDays: 365);
-                // Tomorrow.io fills the NOAA ~90–120 day radar lag with near-real-time hail —
-                // property search includes it, so the report must too or recent storms are missed.
-                var tomorrowKey = HttpContext.RequestServices.GetService<IConfiguration>()?["TomorrowIo:ApiKey"] ?? "";
-                var tomorrowTask = string.IsNullOrWhiteSpace(tomorrowKey)
-                    ? Task.FromResult(new List<RealDataService.HailEvent>())
-                    : _realData.GetTomorrowIoHailAsync(lat, lng, tomorrowKey);
-
-                try { await Task.WhenAll(swdiTask, lsrTask, seTask, windTask, tomorrowTask); } catch { /* partial results OK */ }
-
-                var allHail = new List<RealDataService.HailEvent>();
-                if (swdiTask.IsCompletedSuccessfully)     allHail.AddRange(swdiTask.Result);
-                if (lsrTask.IsCompletedSuccessfully)      allHail.AddRange(lsrTask.Result);
-                if (seTask.IsCompletedSuccessfully)       allHail.AddRange(seTask.Result);
-                if (tomorrowTask.IsCompletedSuccessfully) allHail.AddRange(tomorrowTask.Result);
-
-                var radiusHailHistory = allHail
-                    .Where(e => e.Date >= fiveYearsAgo &&
-                                RealDataService.HaversineDistanceMiles(lat, lng, e.Lat, e.Lng) <= display)
-                    .GroupBy(e => e.Date.Date)
-                    .Select(g => g.OrderByDescending(e => e.SizeInches).First())
-                    .OrderByDescending(e => e.Date)
-                    .ToList();
-
-                // Location-specific accuracy pass (docs/pdf-report-accuracy-punchlist.md item 3).
-                // Point-radius attribution wildly over-includes hail for a given property — validated
-                // 2026-07-16 against two real addresses via /RoofHealth/SwathCompareDebug: one showed
-                // only 2 of 21 radius-attributed dates actually confirmed by the radar swath at that
-                // exact parcel, the other only 1 of 28. For each radius candidate date, ask whether
-                // MRMS MESH actually covers this property that day:
-                //   Contained      -> keep the day, but use the radar-confirmed size band.
-                //   ConfirmedClear -> drop the day — the storm genuinely never reached this address.
-                //   Unknown        -> pipeline failed or date unsupported; keep the original
-                //                      point-radius entry rather than treat "couldn't verify" as
-                //                      "no hail" (see MeshSwathService.GetContainmentAsync).
-                // Gated behind FeatureFlags:MeshSwaths so this can be rolled back instantly (falls
-                // back to plain point-radius, the previously-shipped behavior) without a redeploy.
-                // Not capped per-report — each candidate date is a separate grib+GDAL run on a cache
-                // miss, throttled by MeshSwathService's own 2-concurrent pipeline gate; both
-                // validation runs (21 and 28 candidate dates) completed without issue, but a
-                // storm-heavy property could still make this request noticeably slower than before.
-                if (_config.GetValue<bool>("FeatureFlags:MeshSwaths"))
-                {
-                    var refined = new List<RealDataService.HailEvent>();
-                    foreach (var e in radiusHailHistory)
-                    {
-                        var containment = await _mesh.GetContainmentAsync(lat, lng, e.Date);
-                        switch (containment.Status)
-                        {
-                            case MeshContainmentStatus.Contained:
-                                refined.Add(e with { SizeInches = containment.SizeBandInches ?? e.SizeInches, Source = "mesh" });
-                                break;
-                            case MeshContainmentStatus.ConfirmedClear:
-                                break;
-                            case MeshContainmentStatus.Unknown:
-                            default:
-                                refined.Add(e);
-                                break;
-                        }
-                    }
-                    hailHistory = refined.OrderByDescending(e => e.Date).ToList();
-                }
-                else
-                {
-                    hailHistory = radiusHailHistory;
-                }
-
-                if (windTask.IsCompletedSuccessfully)
-                    windHistory = windTask.Result
-                        .Where(w => w.Date >= oneYearAgo &&
-                                    RealDataService.HaversineDistanceMiles(lat, lng, w.Lat, w.Lng) <= display)
-                        .GroupBy(w => w.Date.Date)
-                        .Select(g => g.OrderByDescending(w => w.SpeedMph).First())
-                        .OrderByDescending(w => w.Date)
-                        .ToList();
-            }
-
-            // Load org branding
-            Data.Models.Org? org = null;
-            byte[]? logoBytes = null;
-            string? logoSvgContent = null;
-            if (orgId.HasValue)
-            {
-                org = await _db.Orgs.FirstOrDefaultAsync(o => o.Id == orgId);
-                if (org != null && !string.IsNullOrWhiteSpace(org.LogoPath))
-                {
-                    var logosDir = Path.Combine(_env.ContentRootPath, "App_Data", "logos");
-                    var logoPath = Path.Combine(logosDir, Path.GetFileName(org.LogoPath));
-                    if (System.IO.File.Exists(logoPath))
-                    {
-                        // SVG is a valid upload format (CompanyController) but is a vector format —
-                        // QuestPDF's .Image() only decodes raster bytes and throws "Cannot load or
-                        // decode provided image" on SVG, which was crashing report generation with a
-                        // 500 (found 2026-07-23 after Jordan uploaded an SVG logo). SVGs need QuestPDF's
-                        // separate .Svg() element, which takes markup text rather than raw bytes.
-                        if (string.Equals(Path.GetExtension(logoPath), ".svg", StringComparison.OrdinalIgnoreCase))
-                            logoSvgContent = await System.IO.File.ReadAllTextAsync(logoPath);
-                        else
-                            logoBytes = await System.IO.File.ReadAllBytesAsync(logoPath);
-                    }
-                }
-            }
-
-            // Fetch static map image for the property
-            byte[]? mapBytes = null;
-            if (lead.Lat.HasValue && lead.Lng.HasValue)
-            {
-                try
-                {
-                    var mapsKey = HttpContext.RequestServices
-                        .GetService<IConfiguration>()?["GoogleMaps:ApiKey"] ?? "";
-                    if (!string.IsNullOrWhiteSpace(mapsKey))
-                    {
-                        var mapUrl = $"https://maps.googleapis.com/maps/api/staticmap" +
-                            $"?center={lead.Lat:F6},{lead.Lng:F6}" +
-                            $"&zoom=16&size=480x260&maptype=roadmap" +
-                            $"&markers=color:red|{lead.Lat:F6},{lead.Lng:F6}" +
-                            $"&key={mapsKey}";
-                        using var http = new System.Net.Http.HttpClient();
-                        http.Timeout = TimeSpan.FromSeconds(8);
-                        mapBytes = await http.GetByteArrayAsync(mapUrl);
-                    }
-                }
-                catch { /* map is optional — don't fail PDF generation */ }
-            }
-
-            var generatedBy = User.Identity?.Name ?? "StormLead Pro User";
-            var pdf         = _reports.Generate(lead, generatedBy, hailHistory, windHistory, org, logoBytes, mapBytes, logoSvgContent);
-
-            if (reportCreditsEnabled && orgId.HasValue && !isUnlimitedPlan)
-            {
-                await _reportCredits.ConsumeAsync(orgId.Value, 1, CurrentUserId,
-                    referenceId: lead.Id.ToString(), referenceType: "lead_report",
-                    description: $"Report generated: {lead.Address}");
-            }
-
-            var filename = $"HailReport-{SlugifyAddress(lead.Address)}-{DateTime.Now:yyyyMMdd}.pdf";
-            return File(pdf, "application/pdf", filename);
-        }
-
-        // Builds a filesystem-safe slug from a street address for use in download filenames,
-        // e.g. "123 Main St, Denver, CO" -> "123-Main-St-Denver-CO".
-        private static string SlugifyAddress(string? address)
-        {
-            if (string.IsNullOrWhiteSpace(address))
-                return "Report";
-
-            var slug = Regex.Replace(address, @"[^A-Za-z0-9]+", "-").Trim('-');
-            return string.IsNullOrEmpty(slug) ? "Report" : slug;
+            return Json(await EnrichLeadAsync(lead));
         }
 
         // ── POST /Leads/BulkEnrich ───────────────────────────────────
+        // Each lookup is billed by the skip-trace provider and runs
+        // sequentially in this request, so cap the batch size.
+        private const int MaxBulkTrace = 100;
+
         [HttpPost("BulkEnrich")]
         public async Task<IActionResult> BulkEnrich([FromBody] BulkRequest req)
         {
-            if (!_config.GetValue<bool>("FeatureFlags:EnrichmentEnabled"))
-                return StatusCode(503, new { error = "Enrichment is currently disabled." });
             if (!CanEnrich)
-                return StatusCode(403, new { error = "Reps cannot run enrichment. Ask an owner or manager." });
+                return StatusCode(403, new { error = "Reps cannot run skip tracing. Ask an owner or manager." });
 
             if (req?.Ids == null || req.Ids.Length == 0)
                 return BadRequest(new { error = "No lead IDs provided." });
+            if (req.Ids.Length > MaxBulkTrace)
+                return BadRequest(new { error = $"Skip trace up to {MaxBulkTrace} leads at a time." });
+            if (!HasSkipTraceProvider)
+                return StatusCode(503, new { error = NoProviderError });
 
             var orgId  = CurrentOrgId;
-            var credit = orgId.HasValue
-                ? await _db.OrgCredits.FirstOrDefaultAsync(c => c.OrgId == orgId && c.CreditType == "enrichment")
-                : null;
-            if (credit != null && credit.Balance <= 0)
-                return StatusCode(402, new { error = "No enrichment credits remaining. Top up your plan to continue." });
-
             var leads  = await _db.Leads
                 .Where(l => req.Ids.Contains(l.Id) &&
                             (l.OrgId == orgId || l.OrgId == null) &&
@@ -462,13 +231,7 @@ namespace CandaceHolder.Controllers
             var results = new List<object>();
             foreach (var lead in leads)
             {
-                // Re-check balance before each enrich in a bulk run
-                if (credit != null && credit.Balance <= 0)
-                {
-                    results.Add(new { id = lead.Id, result = new { status = "no_credits" } });
-                    continue;
-                }
-                var r = await EnrichLeadAsync(lead, credit);
+                var r = await EnrichLeadAsync(lead);
                 results.Add(new { id = lead.Id, result = r });
             }
 
@@ -521,32 +284,9 @@ namespace CandaceHolder.Controllers
             return Json(new { restored = true });
         }
 
-        // ── POST /Leads/BulkArchive ──────────────────────────────────
-        // Soft-deletes leads — enriched leads are protected and skipped.
-        [HttpPost("BulkArchive")]
-        public async Task<IActionResult> BulkArchive([FromBody] BulkRequest req)
-        {
-            if (req?.Ids == null || req.Ids.Length == 0)
-                return BadRequest(new { error = "No lead IDs provided." });
-
-            var orgId  = CurrentOrgId;
-            var leads  = await _db.Leads
-                .Where(l => req.Ids.Contains(l.Id) &&
-                            (l.OrgId == orgId || l.OrgId == null) &&
-                            !l.IsEnriched && l.DeletedAt == null)
-                .ToListAsync();
-
-            var now = DateTime.UtcNow;
-            foreach (var lead in leads)
-                lead.DeletedAt = now;
-
-            await _db.SaveChangesAsync();
-            return Json(new { archived = leads.Count });
-        }
-
         // ── POST /Leads/BulkDelete ───────────────────────────
-        // Soft-deletes all matching leads owned by the current org
-        // (enriched or not). Used by the bulk-actions toolbar.
+        // Soft-deletes (archives) all matching leads owned by the current
+        // org. Used by the bulk-actions toolbar; restorable via Restore.
         [HttpPost("BulkDelete")]
         public async Task<IActionResult> BulkDelete([FromBody] BulkRequest req)
         {
@@ -581,10 +321,6 @@ namespace CandaceHolder.Controllers
             var activeLeadsQ = allLeadsQ.Where(l => l.DeletedAt == null);
             var enrichmentsQ = _db.Enrichments.Where(e => e.UserId == userId);
 
-            var enrichCredit = orgId.HasValue
-                ? await _db.OrgCredits.FirstOrDefaultAsync(c => c.OrgId == orgId && c.CreditType == "enrichment")
-                : null;
-
             return Json(new
             {
                 totalLeads              = await activeLeadsQ.CountAsync(),
@@ -595,8 +331,6 @@ namespace CandaceHolder.Controllers
                 archivedCount           = await allLeadsQ.CountAsync(l => l.DeletedAt != null),
                 totalEnrichments        = await enrichmentsQ.CountAsync(),
                 enrichmentsThisMonth    = await enrichmentsQ.CountAsync(e => e.CreatedAt >= som),
-                enrichCreditsRemaining  = enrichCredit?.Balance,
-                enrichCreditsUsed       = enrichCredit?.UsedThisPeriod,
                 canEnrich               = CanEnrich
             });
         }
@@ -605,9 +339,8 @@ namespace CandaceHolder.Controllers
         [HttpDelete("{id:long}")]
         public async Task<IActionResult> Delete(long id)
         {
-            var lead = await _db.Leads.FindAsync(id);
+            var lead = await FindOwnLeadAsync(id);
             if (lead == null) return NotFound();
-            // Enrichment guard removed — leads are deletable regardless of enrichment state
 
             lead.DeletedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
@@ -617,7 +350,7 @@ namespace CandaceHolder.Controllers
         // ─────────────────────────────────────────────────────────────
         // Shared enrichment logic
         // ─────────────────────────────────────────────────────────────
-        private async Task<object> EnrichLeadAsync(Lead lead, Data.Models.OrgCredit? credit = null)
+        private async Task<object> EnrichLeadAsync(Lead lead)
         {
             var services  = HttpContext.RequestServices;
             var config    = services.GetService<IConfiguration>();
@@ -726,27 +459,6 @@ namespace CandaceHolder.Controllers
                 CreatedAt   = DateTime.UtcNow
             });
 
-            // Deduct one enrichment credit and write an immutable ledger entry
-            if (credit != null)
-            {
-                credit.Balance        = Math.Max(0, credit.Balance - 1);
-                credit.UsedThisPeriod += 1;
-                credit.UpdatedAt      = DateTime.UtcNow;
-
-                _db.OrgCreditTransactions.Add(new Data.Models.OrgCreditTransaction
-                {
-                    OrgId         = credit.OrgId,
-                    UserId        = CurrentUserId,
-                    CreditType    = "enrichment",
-                    Amount        = -1,
-                    BalanceAfter  = credit.Balance,
-                    Description   = $"Lead enriched: {lead.Address}",
-                    ReferenceId   = lead.Id.ToString(),
-                    ReferenceType = "lead",
-                    CreatedAt     = DateTime.UtcNow
-                });
-            }
-
             await _db.SaveChangesAsync();
 
             return new { status, ownerName, yearBuilt, ownerPhone = lead.OwnerPhone, ownerEmail = lead.OwnerEmail };
@@ -831,11 +543,6 @@ namespace CandaceHolder.Controllers
             [JsonPropertyName("address")]         public string? Address         { get; set; }
             [JsonPropertyName("lat")]             public double  Lat             { get; set; }
             [JsonPropertyName("lng")]             public double  Lng             { get; set; }
-            [JsonPropertyName("riskLevel")]       public string? RiskLevel       { get; set; }
-            [JsonPropertyName("lastStormDate")]   public string? LastStormDate   { get; set; }
-            [JsonPropertyName("hailSize")]        public string? HailSize        { get; set; }
-            [JsonPropertyName("estimatedDamage")] public string? EstimatedDamage { get; set; }
-            [JsonPropertyName("roofAge")]         public int     RoofAge         { get; set; }
             [JsonPropertyName("propertyType")]    public string? PropertyType    { get; set; }
         }
 

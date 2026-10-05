@@ -37,7 +37,5 @@ namespace CandaceHolder.Data.Models
         public Org?                      Org          { get; set; }
         public ICollection<Lead>         Leads        { get; set; } = new List<Lead>();
         public ICollection<Enrichment>   Enrichments  { get; set; } = new List<Enrichment>();
-        public ICollection<WatchedArea>  WatchedAreas { get; set; } = new List<WatchedArea>();
-        public ICollection<SentAlert>    SentAlerts   { get; set; } = new List<SentAlert>();
     }
 }

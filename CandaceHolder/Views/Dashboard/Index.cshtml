@@ -1,18 +1,16 @@
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     Layout = null;
-    var alertsEnabled   = Configuration.GetValue<bool>("FeatureFlags:AlertsEnabled");
     var userName        = ViewBag.UserName        as string ?? "Guest";
     var isAdmin         = ViewBag.IsAdmin         is true;
     var totalLeads      = (long)(ViewBag.TotalLeads      ?? 0L);
     var leadsThisMonth  = (long)(ViewBag.LeadsThisMonth  ?? 0L);
-    var enrichmentEnabled = ViewBag.EnrichmentEnabled is true;
     var totalEnrich     = (long)(ViewBag.TotalEnrich     ?? 0L);
     var enrichThisMonth = (long)(ViewBag.EnrichThisMonth ?? 0L);
     var pipelineCount   = (long)(ViewBag.PipelineCount   ?? 0L);
     var closedWonCount  = (long)(ViewBag.ClosedWonCount  ?? 0L);
     var winRate         = ViewBag.WinRate as int?;
-    var recentLeads     = ViewBag.RecentLeads     as List<(string Address, string Risk, string Hail, string SavedAt)> ?? new();
+    var recentLeads     = ViewBag.RecentLeads     as List<(long Id, string Address, string Owner, bool IsEnriched, string SavedAt)> ?? new();
     var recentEnrich    = ViewBag.RecentEnrich    as List<(string Address, string Status, string CreatedAt)>          ?? new();
 }
 <!DOCTYPE html>
@@ -20,7 +18,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard — StormLead Pro</title>
+    <title>Dashboard — Candace Holder</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
@@ -28,27 +26,19 @@
 </head>
 <body class="min-h-screen">
 
-@await Html.PartialAsync("_TrialBanner")
-
 <!-- Header -->
 <header class="sticky top-0 z-50 bg-[#0f172a] border-b border-slate-700/60 shadow-lg relative">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
         <a href="/" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
             <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center shadow">
-                <i class="fa-solid fa-house-chimney text-white text-sm"></i>
+                <i class="fa-solid fa-address-book text-white text-sm"></i>
             </div>
-            <span class="text-lg font-extrabold tracking-tight">Storm<span class="text-brand">Lead</span> Pro</span>
+            <span class="text-lg font-extrabold tracking-tight">Candace <span class="text-brand">Holder</span></span>
         </a>
         <nav class="hidden lg:flex items-center gap-6 text-sm text-slate-400">
             <a href="/" class="hover:text-white transition-colors">Search</a>
             <a href="/Leads/Saved" class="hover:text-white transition-colors">Saved Leads</a>
             <a href="/Dashboard" class="text-white font-semibold">Dashboard</a>
-            @if (alertsEnabled)
-            {
-                <a href="/Alerts" class="hover:text-white transition-colors">
-                    <i class="fa-solid fa-bell mr-1 text-xs"></i>Alerts
-                </a>
-            }
             <a href="/Help" class="hover:text-white transition-colors">
                 <i class="fa-solid fa-circle-question mr-1 text-xs"></i>Help
             </a>
@@ -79,12 +69,6 @@
         <a href="/Dashboard" class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-700/60 text-white font-semibold text-sm">
             <i class="fa-solid fa-chart-bar text-brand w-4 text-center text-xs"></i>Dashboard
         </a>
-        @if (alertsEnabled)
-        {
-            <a href="/Alerts" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
-                <i class="fa-solid fa-bell w-4 text-center text-xs"></i>Alerts
-            </a>
-        }
         <a href="/Help" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
             <i class="fa-solid fa-circle-question w-4 text-center text-xs"></i>Help
         </a>
@@ -117,17 +101,14 @@
         <div class="stat-card">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Leads This Month</p>
             <p class="text-3xl font-extrabold text-brand">@leadsThisMonth</p>
-            <p class="text-xs text-slate-500 mt-1">current billing period</p>
+            <p class="text-xs text-slate-500 mt-1">current month</p>
         </div>
 
-        @if (enrichmentEnabled)
-        {
         <div class="stat-card">
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Enrichments</p>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Skip Traces</p>
             <p class="text-3xl font-extrabold text-white">@enrichThisMonth</p>
             <p class="text-xs text-slate-500 mt-1">this month · @totalEnrich total</p>
         </div>
-        }
 
         <div class="stat-card">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Win Rate</p>
@@ -145,7 +126,7 @@
 
     </div>
 
-    <!-- Two-column: Recent Leads + Recent Enrichments -->
+    <!-- Two-column: Recent Leads + Recent Skip Traces -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <!-- Recent leads -->
@@ -162,22 +143,22 @@
                     <thead>
                         <tr>
                             <th class="text-left text-xs font-semibold text-slate-500 uppercase px-5 py-3 bg-slate-800/60">Address</th>
-                            <th class="text-left text-xs font-semibold text-slate-500 uppercase px-5 py-3 bg-slate-800/60">Risk</th>
-                            <th class="text-left text-xs font-semibold text-slate-500 uppercase px-5 py-3 bg-slate-800/60 hidden sm:table-cell">Hail</th>
+                            <th class="text-left text-xs font-semibold text-slate-500 uppercase px-5 py-3 bg-slate-800/60">Owner</th>
+                            <th class="text-left text-xs font-semibold text-slate-500 uppercase px-5 py-3 bg-slate-800/60 hidden sm:table-cell">Traced</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var lead in recentLeads)
                         {
-                            var badgeClass = lead.Risk == "High" ? "badge-high" : lead.Risk == "Medium" ? "badge-medium" : "badge-low";
                             <tr class="border-b border-slate-700/40 hover:bg-slate-700/20 transition-colors">
                                 <td class="px-5 py-3 text-xs text-white max-w-[200px]">
-                                    <span class="block truncate" title="@lead.Address">@lead.Address</span>
+                                    <a href="/Leads/@lead.Id" class="block truncate hover:text-brand" title="@lead.Address">@lead.Address</a>
                                 </td>
-                                <td class="px-5 py-3">
-                                    <span class="@badgeClass px-2 py-0.5 rounded-full text-xs font-bold">@lead.Risk</span>
+                                <td class="px-5 py-3 text-xs text-slate-300">@(string.IsNullOrEmpty(lead.Owner) ? "—" : lead.Owner)</td>
+                                <td class="px-5 py-3 text-xs hidden sm:table-cell">
+                                    @if (lead.IsEnriched) { <span class="text-green-400 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>Yes</span> }
+                                    else { <span class="text-slate-500">No</span> }
                                 </td>
-                                <td class="px-5 py-3 text-xs text-slate-400 hidden sm:table-cell">@lead.Hail</td>
                             </tr>
                         }
                     </tbody>
@@ -187,20 +168,18 @@
             {
                 <div class="flex flex-col items-center justify-center py-12 text-slate-500 gap-2">
                     <i class="fa-solid fa-map-pin text-3xl text-slate-700"></i>
-                    <p class="text-sm">No leads yet — <a href="/" class="text-brand hover:underline">start a scan</a></p>
+                    <p class="text-sm">No leads yet — <a href="/" class="text-brand hover:underline">find some addresses</a></p>
                 </div>
             }
         </div>
 
-        @if (enrichmentEnabled)
-        {
-        <!-- Recent enrichments -->
+        <!-- Recent skip traces -->
         <div class="rounded-2xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
             <div class="px-5 py-4 border-b border-slate-700/60 flex items-center justify-between">
                 <h2 class="text-sm font-bold text-white">
-                    <i class="fa-solid fa-bolt text-brand mr-2"></i>Recent Enrichments
+                    <i class="fa-solid fa-magnifying-glass-dollar text-brand mr-2"></i>Recent Skip Traces
                 </h2>
-                <span class="text-xs text-slate-500">per-record contact lookup</span>
+                <span class="text-xs text-slate-500">your lookups</span>
             </div>
             @if (recentEnrich.Any())
             {
@@ -230,12 +209,11 @@
             else
             {
                 <div class="flex flex-col items-center justify-center py-12 text-slate-500 gap-2">
-                    <i class="fa-solid fa-bolt text-3xl text-slate-700"></i>
-                    <p class="text-sm">No enrichments yet</p>
+                    <i class="fa-solid fa-magnifying-glass-dollar text-3xl text-slate-700"></i>
+                    <p class="text-sm">No skip traces yet</p>
                 </div>
             }
         </div>
-        }
 
     </div><!-- /grid -->
 
@@ -246,9 +224,9 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
         <div class="flex items-center gap-2">
             <div class="w-5 h-5 bg-brand/80 rounded flex items-center justify-center">
-                <i class="fa-solid fa-house-chimney text-white text-xs"></i>
+                <i class="fa-solid fa-address-book text-white text-xs"></i>
             </div>
-            <span>StormLead Pro &copy; 2026</span>
+            <span>Candace Holder &copy; 2026</span>
         </div>
         <a href="/Leads/Saved" class="text-brand hover:text-orange-300 transition-colors text-xs">View all saved leads &rarr;</a>
     </div>

@@ -12,13 +12,11 @@ namespace CandaceHolder.Controllers
     {
         private readonly AppDbContext _db;
         private readonly string       _adminEmail;
-        private readonly bool         _enrichmentEnabled;
 
         public DashboardController(AppDbContext db, IConfiguration config)
         {
-            _db                = db;
-            _adminEmail        = config["AdminEmail"] ?? "";
-            _enrichmentEnabled = config.GetValue<bool>("FeatureFlags:EnrichmentEnabled");
+            _db         = db;
+            _adminEmail = config["AdminEmail"] ?? "";
         }
 
         private long? CurrentUserId =>
@@ -48,7 +46,6 @@ namespace CandaceHolder.Controllers
 
             ViewBag.UserName           = User.Identity?.Name ?? "Guest";
             ViewBag.IsAdmin            = IsAdmin();
-            ViewBag.EnrichmentEnabled  = _enrichmentEnabled;
             ViewBag.TotalLeads         = await leadsQ.CountAsync();
             ViewBag.LeadsThisMonth     = await leadsQ.CountAsync(l => l.SavedAt >= som);
             ViewBag.PipelineCount      = await leadsQ.CountAsync(l => pipelineStatuses.Contains(l.Status));
@@ -58,36 +55,34 @@ namespace CandaceHolder.Controllers
             var rawLeads = await leadsQ
                 .OrderByDescending(l => l.SavedAt)
                 .Take(8)
-                .Select(l => new { l.Address, l.RiskLevel, l.HailSize, l.SavedAt })
+                .Select(l => new { l.Id, l.Address, l.OwnerName, l.IsEnriched, l.SavedAt })
                 .ToListAsync();
 
             ViewBag.RecentLeads = rawLeads
                 .Select(l => (
-                    Address: l.Address ?? "",
-                    Risk:    l.RiskLevel ?? "",
-                    Hail:    l.HailSize  ?? "",
-                    SavedAt: l.SavedAt.ToString("o")
+                    Id:         l.Id,
+                    Address:    l.Address ?? "",
+                    Owner:      l.OwnerName ?? "",
+                    IsEnriched: l.IsEnriched,
+                    SavedAt:    l.SavedAt.ToString("o")
                 ))
                 .ToList();
 
-            if (_enrichmentEnabled)
-            {
-                var enrichmentsQ = _db.Enrichments.Where(e => e.UserId == userId);
-                ViewBag.TotalEnrich     = await enrichmentsQ.CountAsync();
-                ViewBag.EnrichThisMonth = await enrichmentsQ.CountAsync(e => e.CreatedAt >= som);
-                var rawEnrich = await enrichmentsQ
-                    .OrderByDescending(e => e.CreatedAt)
-                    .Take(5)
-                    .Select(e => new { e.Address, e.Status, e.CreatedAt })
-                    .ToListAsync();
-                ViewBag.RecentEnrich = rawEnrich
-                    .Select(e => (
-                        Address:   e.Address   ?? "",
-                        Status:    e.Status    ?? "",
-                        CreatedAt: e.CreatedAt.ToString("o")
-                    ))
-                    .ToList();
-            }
+            var enrichmentsQ = _db.Enrichments.Where(e => e.UserId == userId);
+            ViewBag.TotalEnrich     = await enrichmentsQ.CountAsync();
+            ViewBag.EnrichThisMonth = await enrichmentsQ.CountAsync(e => e.CreatedAt >= som);
+            var rawEnrich = await enrichmentsQ
+                .OrderByDescending(e => e.CreatedAt)
+                .Take(5)
+                .Select(e => new { e.Address, e.Status, e.CreatedAt })
+                .ToListAsync();
+            ViewBag.RecentEnrich = rawEnrich
+                .Select(e => (
+                    Address:   e.Address   ?? "",
+                    Status:    e.Status    ?? "",
+                    CreatedAt: e.CreatedAt.ToString("o")
+                ))
+                .ToList();
 
             return View();
         }

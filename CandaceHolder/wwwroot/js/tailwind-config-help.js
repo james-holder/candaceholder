@@ -1,7 +1,6 @@
 // Tailwind CDN theme config for Views/Help/Index.cshtml.
-// Extracted 2026-07-17, content unchanged from the original inline <script> block. Kept
-// separate from tailwind-config-app.js because this page also sets a custom Inter font
-// family (like the marketing landing page) and a slightly different navy shade set.
+// Kept separate from tailwind-config-app.js because this page also sets a custom Inter
+// font family and a slightly different navy shade set.
 tailwind.config = {
     theme: {
         extend: {
