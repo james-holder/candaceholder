@@ -445,7 +445,10 @@ out center;";
         // ─────────────────────────────────────────────────────────────────
         public const int BatchDataMaxPerRequest = 100;
 
-        public record SkipTracePhone(string Number, string? Type, bool IsDnc);
+        /// <param name="Score">BatchData's confidence (0–100) that the number belongs to this person.</param>
+        /// <param name="Tested">BatchData checked whether the line is live.</param>
+        /// <param name="Reachable">Result of that check (only meaningful when Tested).</param>
+        public record SkipTracePhone(string Number, string? Type, bool IsDnc, int? Score = null, bool? Tested = null, bool? Reachable = null);
         public record SkipTraceResult(string? OwnerName, List<SkipTracePhone> Phones, List<string> Emails, bool IsLitigator);
 
         /// <summary>
@@ -543,7 +546,10 @@ out center;";
                         var type = n.TryGetProperty("type", out var tv) ? tv.GetString() : null;
                         var dnc  = personDnc ||
                                    (n.TryGetProperty("dnc", out var dv) && AnyTrue(dv));
-                        phones.Add(new SkipTracePhone(FormatPhone(number), type, dnc));
+                        int? score = n.TryGetProperty("score", out var sv) && sv.ValueKind == JsonValueKind.Number ? sv.GetInt32() : null;
+                        bool? tested    = n.TryGetProperty("tested", out var te) && te.ValueKind is JsonValueKind.True or JsonValueKind.False ? te.GetBoolean() : null;
+                        bool? reachable = n.TryGetProperty("reachable", out var re) && re.ValueKind is JsonValueKind.True or JsonValueKind.False ? re.GetBoolean() : null;
+                        phones.Add(new SkipTracePhone(FormatPhone(number), type, dnc, score, tested, reachable));
                     }
                 }
 

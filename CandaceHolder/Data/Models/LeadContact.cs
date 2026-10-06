@@ -14,6 +14,12 @@ namespace CandaceHolder.Data.Models
         public bool      IsDnc       { get; set; }
         /// <summary>Person is a known TCPA litigator (sues over calls/texts) — don't contact.</summary>
         public bool      IsLitigator { get; set; }
+        /// <summary>BatchData confidence 0–100 that this phone belongs to the person (null = not provided).</summary>
+        public int?      PhoneScore     { get; set; }
+        /// <summary>BatchData tested whether the line is live.</summary>
+        public bool?     PhoneTested    { get; set; }
+        /// <summary>Result of that test.</summary>
+        public bool?     PhoneReachable { get; set; }
         /// <summary>owner | resident</summary>
         public string    ContactType { get; set; } = "owner";
         public bool      IsPrimary   { get; set; }

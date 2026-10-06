@@ -121,9 +121,12 @@ namespace CandaceHolder.Controllers
                     l.SourceAddress, l.SavedAt, l.Notes,
                     l.OwnerName, l.OwnerPhone, l.OwnerEmail,
                     l.YearBuilt, l.IsEnriched, l.Status,
-                    Contacts = l.Contacts.Select(c => new {
+                    Contacts = l.Contacts
+                        .OrderByDescending(c => c.IsPrimary)
+                        .ThenByDescending(c => c.PhoneScore)
+                        .Select(c => new {
                         c.Id, c.Name, c.Phone, c.Email,
-                        c.PhoneType, c.IsDnc, c.IsLitigator,
+                        c.PhoneType, c.IsDnc, c.IsLitigator, c.PhoneScore, c.PhoneTested, c.PhoneReachable,
                         c.ContactType, c.IsPrimary, c.Source
                     }).ToList()
                 })
@@ -418,21 +421,30 @@ namespace CandaceHolder.Controllers
                         var r = results[i];
                         if (r == null) continue;
 
+                        // Best numbers first: tested-dead lines last, then by confidence.
+                        var phones = r.Phones
+                            .OrderBy(ph => ph.Tested == true && ph.Reachable == false)
+                            .ThenByDescending(ph => ph.Score ?? -1)
+                            .ToList();
+
                         var contacts = new List<LeadContact>();
-                        for (int p = 0; p < r.Phones.Count; p++)
+                        for (int p = 0; p < phones.Count; p++)
                         {
                             contacts.Add(new LeadContact
                             {
-                                Name        = r.OwnerName,
-                                Phone       = r.Phones[p].Number,
-                                PhoneType   = r.Phones[p].Type,
-                                IsDnc       = r.Phones[p].IsDnc,
-                                IsLitigator = r.IsLitigator,
-                                Email       = p < r.Emails.Count ? r.Emails[p] : null
+                                Name           = r.OwnerName,
+                                Phone          = phones[p].Number,
+                                PhoneType      = phones[p].Type,
+                                IsDnc          = phones[p].IsDnc,
+                                PhoneScore     = phones[p].Score,
+                                PhoneTested    = phones[p].Tested,
+                                PhoneReachable = phones[p].Reachable,
+                                IsLitigator    = r.IsLitigator,
+                                Email          = p < r.Emails.Count ? r.Emails[p] : null
                             });
                         }
                         // Any emails beyond the number of phones get their own rows.
-                        foreach (var email in r.Emails.Skip(r.Phones.Count))
+                        foreach (var email in r.Emails.Skip(phones.Count))
                             contacts.Add(new LeadContact { Name = r.OwnerName, Email = email, IsLitigator = r.IsLitigator });
 
                         ReplaceContacts(lead, r.OwnerName, contacts, "batchdata");
@@ -499,7 +511,9 @@ namespace CandaceHolder.Controllers
             if (ownerName != null && lead.OwnerName == null)
                 lead.OwnerName = ownerName;
             // Prefer a callable number: first phone that isn't on a Do Not Call list.
-            var phone = contacts.FirstOrDefault(c => c.Phone != null && !c.IsDnc && !c.IsLitigator)?.Phone
+            // Contacts arrive best-first, so this is the highest-confidence callable line.
+            var phone = contacts.FirstOrDefault(c => c.Phone != null && !c.IsDnc && !c.IsLitigator && c.PhoneReachable != false)?.Phone
+                     ?? contacts.FirstOrDefault(c => c.Phone != null && !c.IsDnc && !c.IsLitigator)?.Phone
                      ?? contacts.FirstOrDefault(c => c.Phone != null)?.Phone;
             if (phone != null && lead.OwnerPhone == null)
                 lead.OwnerPhone = phone;
@@ -526,8 +540,8 @@ namespace CandaceHolder.Controllers
                     "emails": [ { "email": "johndoe@gmail.net" } ],
                     "name": { "first": "john", "last": "doe" },
                     "phoneNumbers": [
-                      { "number": "1111111111", "type": "Mobile", "score": 100 },
-                      { "number": "2222222222", "type": "Land Line", "dnc": true, "score": 95 }
+                      { "number": "1111111111", "type": "Mobile", "tested": true, "reachable": true, "score": 100 },
+                      { "number": "2222222222", "type": "Land Line", "dnc": true, "tested": false, "reachable": false, "score": 95 }
                     ],
                     "litigator": false,
                     "meta": { "matched": true, "error": false }

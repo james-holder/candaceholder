@@ -133,6 +133,10 @@ using (var scope = app.Services.CreateScope())
     AddColumnIfMissing("lead_contacts", "phone_type",   "TEXT");
     AddColumnIfMissing("lead_contacts", "is_dnc",       "INTEGER NOT NULL DEFAULT 0");
     AddColumnIfMissing("lead_contacts", "is_litigator", "INTEGER NOT NULL DEFAULT 0");
+    // 2026-10-06: BatchData phone confidence score + live-line check
+    AddColumnIfMissing("lead_contacts", "phone_score",     "INTEGER");
+    AddColumnIfMissing("lead_contacts", "phone_tested",    "INTEGER");
+    AddColumnIfMissing("lead_contacts", "phone_reachable", "INTEGER");
 
     // 2026-10-06: email templates, sends log and unsubscribe list
     using (var cmd = conn.CreateCommand())

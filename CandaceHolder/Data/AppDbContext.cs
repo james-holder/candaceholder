@@ -156,6 +156,9 @@ namespace CandaceHolder.Data
                 e.Property(c => c.PhoneType).HasColumnName("phone_type");
                 e.Property(c => c.IsDnc).HasColumnName("is_dnc").HasDefaultValue(false);
                 e.Property(c => c.IsLitigator).HasColumnName("is_litigator").HasDefaultValue(false);
+                e.Property(c => c.PhoneScore).HasColumnName("phone_score");
+                e.Property(c => c.PhoneTested).HasColumnName("phone_tested");
+                e.Property(c => c.PhoneReachable).HasColumnName("phone_reachable");
                 e.Property(c => c.ContactType).HasColumnName("contact_type").HasDefaultValue("owner");
                 e.Property(c => c.IsPrimary).HasColumnName("is_primary").HasDefaultValue(false);
                 e.Property(c => c.Source).HasColumnName("source").HasDefaultValue("batchdata");

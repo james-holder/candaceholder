@@ -439,6 +439,7 @@ function buildRow(lead) {
         : '';
     const phoneCell = lead.ownerPhone
         ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="text-green-600 hover:text-green-700 whitespace-nowrap">' + escapeHtml(lead.ownerPhone) + '</a>' +
+          scoreBadge((lead.contacts || []).find(function (c) { return c.phone === lead.ownerPhone; })) +
           contactWarning(lead) + extraContacts
         : '<span class="text-slate-600">—</span>';
     const emailCell = lead.ownerEmail
@@ -475,6 +476,7 @@ function buildContactList(lead) {
               '<i class="fa-solid ' + (/mobile/i.test(c.phoneType || '') ? 'fa-mobile-screen' : 'fa-phone') + ' text-[10px] mr-1"></i>' +
               escapeHtml(c.phone) + '</a>' +
               (c.phoneType ? ' <span class="text-[10px] text-slate-500">' + escapeHtml(c.phoneType) + '</span>' : '') +
+              scoreBadge(c) +
               (c.isDnc ? badge('DNC', 'On a Do Not Call list, do not cold call or text') : '')
             : '<span class="text-slate-600">—</span>';
         var email = c.email
@@ -489,6 +491,20 @@ function buildContactList(lead) {
     }).join('');
     return '<div class="pl-1"><p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">' +
            '<i class="fa-solid fa-users mr-1"></i>All contacts</p>' + rows + '</div>';
+}
+
+// Confidence badge for a phone (BatchData score 0-100) + "Not working" if the
+// line was tested dead. Green 90+, amber 70-89, gray below.
+function scoreBadge(c) {
+    if (!c) return '';
+    var html = '';
+    if (c.phoneScore != null) {
+        var cls = c.phoneScore >= 90 ? 'bg-green-100 text-green-800' : c.phoneScore >= 70 ? 'bg-amber-100 text-amber-800' : 'bg-slate-700 text-slate-400';
+        html += ' <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold ' + cls + '" title="BatchData confidence that this number belongs to this person">' + c.phoneScore + '%</span>';
+    }
+    if (c.phoneTested && c.phoneReachable === false)
+        html += ' <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700" title="Tested by BatchData and did not connect">NOT WORKING</span>';
+    return html;
 }
 
 // DNC / litigator badge for the lead's main phone (flags come from the skip trace)
@@ -560,7 +576,7 @@ async function enrichLead(id, btn) {
 // One row per contact (so multiple phones/emails from a skip trace all
 // come through), falling back to the lead's owner fields.
 function exportCSV(leadsOverride) {
-    var header = ['Address','Owner / Contact Name','Phone','Phone Type','DNC','Litigator','Email','Contact Type','Is Primary',
+    var header = ['Address','Owner / Contact Name','Phone','Phone Type','Match %','Line Tested Live','DNC','Litigator','Email','Contact Type','Is Primary',
                   'Year Built','Traced','Status','Notes','Source','Saved At'];
 
     function q(v) { return '"' + (v == null ? '' : v).toString().replace(/"/g,'""') + '"'; }
@@ -573,11 +589,12 @@ function exportCSV(leadsOverride) {
         var contacts = (l.contacts && l.contacts.length > 0) ? l.contacts : null;
         if (contacts) {
             contacts.forEach(function(c) {
-                rows.push([q(l.address), q(c.name), q(c.phone), q(c.phoneType), q(c.isDnc ? 'Yes' : ''), q(c.isLitigator ? 'Yes' : ''),
+                rows.push([q(l.address), q(c.name), q(c.phone), q(c.phoneType), q(c.phoneScore),
+                           q(c.phoneTested ? (c.phoneReachable ? 'Yes' : 'No') : ''), q(c.isDnc ? 'Yes' : ''), q(c.isLitigator ? 'Yes' : ''),
                            q(c.email), q(c.contactType), q(c.isPrimary ? 'Yes' : 'No')].concat(tail).join(','));
             });
         } else {
-            rows.push([q(l.address), q(l.ownerName), q(l.ownerPhone), q(''), q(''), q(''), q(l.ownerEmail), q('owner'), q('Yes')].concat(tail).join(','));
+            rows.push([q(l.address), q(l.ownerName), q(l.ownerPhone), q(''), q(''), q(''), q(''), q(''), q(l.ownerEmail), q('owner'), q('Yes')].concat(tail).join(','));
         }
     });
 
