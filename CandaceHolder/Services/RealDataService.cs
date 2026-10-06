@@ -561,6 +561,52 @@ out center;";
             _                    => false
         };
 
+        // ─────────────────────────────────────────────────────────────────
+        // BatchData wallet balance — free to call (no credits used).
+        //   GET https://api.batchdata.com/api/v1/wallet/balance
+        //   Needs a token with the wallet-balance permission.
+        //   Docs: https://developer.batchdata.com/docs/batchdata/batchdata-v1/operations/get-a-wallet-balance
+        // ─────────────────────────────────────────────────────────────────
+        public record WalletBalance(decimal Balance, string Currency, DateTimeOffset? AsOf);
+
+        /// <summary>Returns the balance, or null with an error message if the request failed.</summary>
+        public async Task<(WalletBalance? Balance, string? Error)> GetBatchDataWalletBalanceAsync(string apiKey)
+        {
+            try
+            {
+                using var client  = _httpFactory.CreateClient("batchdata");
+                using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.batchdata.com/api/v1/wallet/balance");
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+                request.Headers.Accept.ParseAdd("application/json");
+
+                var resp = await client.SendAsync(request);
+                var body = await resp.Content.ReadAsStringAsync();
+                if (!resp.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("BatchData wallet balance returned {Status}: {Body}",
+                        (int)resp.StatusCode, body.Length > 300 ? body[..300] : body);
+                    return (null, (int)resp.StatusCode switch
+                    {
+                        401 => "BatchData rejected the API token.",
+                        403 => "The BatchData token doesn't have the wallet-balance permission.",
+                        _   => $"BatchData returned HTTP {(int)resp.StatusCode}."
+                    });
+                }
+
+                using var doc = JsonDocument.Parse(body);
+                var r = doc.RootElement.GetProperty("results");
+                var balance  = r.GetProperty("balance").GetDecimal();
+                var currency = r.TryGetProperty("currency", out var c) ? c.GetString() ?? "USD" : "USD";
+                DateTimeOffset? asOf = r.TryGetProperty("asOf", out var a) && DateTimeOffset.TryParse(a.GetString(), out var t) ? t : null;
+                return (new WalletBalance(balance, currency, asOf), null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "BatchData wallet balance call failed");
+                return (null, "Couldn't reach BatchData.");
+            }
+        }
+
         // "2145551234" → "(214) 555-1234"; anything else is returned as-is.
         private static string FormatPhone(string raw)
         {

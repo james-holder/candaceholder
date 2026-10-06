@@ -16,6 +16,7 @@ namespace CandaceHolder.Data
         public DbSet<Lead>         Leads        => Set<Lead>();
         public DbSet<Enrichment>   Enrichments  => Set<Enrichment>();
         public DbSet<LeadContact>  LeadContacts => Set<LeadContact>();
+        public DbSet<AppSetting>   AppSettings  => Set<AppSetting>();
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -164,6 +165,16 @@ namespace CandaceHolder.Data
                  .WithMany(l => l.Contacts)
                  .HasForeignKey(c => c.LeadId)
                  .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── AppSetting ───────────────────────────────────────────────
+            m.Entity<AppSetting>(e =>
+            {
+                e.ToTable("app_settings");
+                e.HasKey(s => s.Key);
+                e.Property(s => s.Key).HasColumnName("key");
+                e.Property(s => s.Value).HasColumnName("value");
+                e.Property(s => s.UpdatedAt).HasColumnName("updated_at");
             });
 
             // ── Enrichment ───────────────────────────────────────────────

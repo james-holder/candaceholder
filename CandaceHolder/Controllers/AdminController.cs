@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using CandaceHolder.Data;
 using CandaceHolder.Services;
 using System.Security.Claims;
@@ -13,12 +14,19 @@ namespace CandaceHolder.Controllers
         private readonly EmailService        _email;
         private readonly string              _adminEmail;
         private readonly IConfiguration      _config;
+        private readonly SettingsService     _settings;
+        private readonly RealDataService     _realData;
+        private readonly IMemoryCache        _cache;
 
-        public AdminController(AppDbContext db, EmailService email, IConfiguration config)
+        public AdminController(AppDbContext db, EmailService email, IConfiguration config,
+                               SettingsService settings, RealDataService realData, IMemoryCache cache)
         {
             _db         = db;
             _email      = email;
             _config     = config;
+            _settings   = settings;
+            _realData   = realData;
+            _cache      = cache;
             _adminEmail = config["AdminEmail"] ?? "";
         }
 
@@ -55,6 +63,27 @@ namespace CandaceHolder.Controllers
             ViewBag.LeadsMonth   = await _db.Leads.CountAsync(l => l.SavedAt >= som);
             ViewBag.TotalEnrich  = await _db.Enrichments.CountAsync();
             ViewBag.EnrichMonth  = await _db.Enrichments.CountAsync(e => e.CreatedAt >= som);
+            ViewBag.EmailConfigured = _email.IsConfigured;
+
+            // BatchData wallet — free to query; cached briefly so page refreshes
+            // don't hammer it. A wallet-only token is preferred if one is set.
+            var walletKey = _config["BatchData:WalletApiKey"];
+            if (string.IsNullOrWhiteSpace(walletKey)) walletKey = _config["BatchData:ApiKey"];
+            if (!string.IsNullOrWhiteSpace(walletKey))
+            {
+                var wallet = await _cache.GetOrCreateAsync("batchdata-wallet", async entry =>
+                {
+                    var result = await _realData.GetBatchDataWalletBalanceAsync(walletKey);
+                    entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(result.Balance != null ? 2 : 0.25);
+                    return result;
+                });
+                var rate = _config.GetValue<decimal?>("Billing:RatePerMatch") ?? 0.07m;
+                ViewBag.WalletBalance = wallet.Balance;
+                ViewBag.WalletError   = wallet.Error;
+                ViewBag.WalletTraces  = wallet.Balance != null && rate > 0 ? (int)(wallet.Balance.Balance / rate) : (int?)null;
+                ViewBag.WalletLow     = wallet.Balance != null &&
+                                        wallet.Balance.Balance < (_config.GetValue<decimal?>("Billing:LowBalanceWarning") ?? 5m);
+            }
 
             var users = await _db.Users
                 .OrderByDescending(u => u.CreatedAt)
@@ -160,6 +189,79 @@ namespace CandaceHolder.Controllers
             public string   Address   { get; set; } = "";
             public string   RunBy     { get; set; } = "";
             public string   Provider  { get; set; } = "";
+        }
+
+        // ── GET /Admin/Email — SMTP settings ──────────────────────────
+        private static readonly string[] EmailKeys =
+            { "Email:SmtpHost", "Email:SmtpPort", "Email:Username", "Email:Password", "Email:FromAddress", "Email:FromName" };
+
+        [HttpGet("Email")]
+        public IActionResult EmailSettings()
+        {
+            if (!IsSuperAdmin()) return Redirect("/Admin");
+
+            ViewBag.Values       = EmailKeys.ToDictionary(k => k, k => k == "Email:Password" ? null : _settings.Get(k));
+            ViewBag.HasPassword  = !string.IsNullOrEmpty(_settings.Get("Email:Password"));
+            ViewBag.IsConfigured = _email.IsConfigured;
+            ViewBag.MyEmail      = User.FindFirst(ClaimTypes.Email)?.Value ?? "";
+            return View("Email");
+        }
+
+        // ── POST /Admin/Email ─────────────────────────────────────────
+        // A blank password keeps the saved one; tick "clear" to remove it.
+        [HttpPost("Email")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveEmailSettings(
+            string? smtpHost, string? smtpPort, string? username, string? password, bool clearPassword,
+            string? fromAddress, string? fromName)
+        {
+            if (!IsSuperAdmin()) return Redirect("/Admin");
+
+            if (!string.IsNullOrWhiteSpace(smtpPort) && !int.TryParse(smtpPort, out _))
+            {
+                TempData["AdminError"] = "Port must be a number (usually 587 or 465).";
+                return RedirectToAction(nameof(EmailSettings));
+            }
+            if (!string.IsNullOrWhiteSpace(fromAddress) && !System.Net.Mail.MailAddress.TryCreate(fromAddress.Trim(), out _))
+            {
+                TempData["AdminError"] = "The From address isn't a valid email address.";
+                return RedirectToAction(nameof(EmailSettings));
+            }
+
+            var values = new Dictionary<string, string?>
+            {
+                ["Email:SmtpHost"]    = smtpHost,
+                ["Email:SmtpPort"]    = smtpPort,
+                ["Email:Username"]    = username,
+                ["Email:FromAddress"] = fromAddress,
+                ["Email:FromName"]    = fromName,
+            };
+            if (clearPassword)                              values["Email:Password"] = null;
+            else if (!string.IsNullOrEmpty(password))       values["Email:Password"] = password;
+
+            await _settings.SetAsync(values);
+            TempData["AdminOk"] = "Email settings saved. Send a test email to make sure they work.";
+            return RedirectToAction(nameof(EmailSettings));
+        }
+
+        // ── POST /Admin/Email/Test ────────────────────────────────────
+        [HttpPost("Email/Test")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> TestEmail(string to)
+        {
+            if (!IsSuperAdmin()) return Redirect("/Admin");
+
+            if (string.IsNullOrWhiteSpace(to) || !System.Net.Mail.MailAddress.TryCreate(to.Trim(), out _))
+            {
+                TempData["AdminError"] = "Enter a valid address to send the test to.";
+                return RedirectToAction(nameof(EmailSettings));
+            }
+
+            var error = await _email.SendTestAsync(to.Trim());
+            TempData[error == null ? "AdminOk" : "AdminError"] = error == null
+                ? $"Test email sent to {to.Trim()} — check the inbox (and spam folder)."
+                : $"Test email failed: {error}";
+            return RedirectToAction(nameof(EmailSettings));
         }
 
         // ── POST /Admin/Users/{id}/Role ────────────────────────────────

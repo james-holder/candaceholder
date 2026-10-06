@@ -102,6 +102,7 @@ builder.Services.AddHttpClient("whitepages", c =>
 
 // ── Services ──────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<RealDataService>();
+builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<EmailService>();
 
 // ── Pipeline ──────────────────────────────────────────────────────────────
@@ -132,6 +133,19 @@ using (var scope = app.Services.CreateScope())
     AddColumnIfMissing("lead_contacts", "phone_type",   "TEXT");
     AddColumnIfMissing("lead_contacts", "is_dnc",       "INTEGER NOT NULL DEFAULT 0");
     AddColumnIfMissing("lead_contacts", "is_litigator", "INTEGER NOT NULL DEFAULT 0");
+
+    // 2026-10-06: settings editable from Admin (Email settings)
+    using (var cmd = conn.CreateCommand())
+    {
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key        TEXT NOT NULL PRIMARY KEY,
+                value      TEXT,
+                updated_at TEXT NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+    }
 
     // ── Dev-only seed login ───────────────────────────────────────────────
     // Gives you a ready-to-use account at /Auth/Login on localhost without

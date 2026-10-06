@@ -1,0 +1,161 @@
+@{
+    Layout = null;
+    var values       = ViewBag.Values as Dictionary<string, string?> ?? new();
+    var hasPassword  = ViewBag.HasPassword is true;
+    var isConfigured = ViewBag.IsConfigured is true;
+    var myEmail      = ViewBag.MyEmail as string ?? "";
+    string V(string key) => values.TryGetValue(key, out var v) ? v ?? "" : "";
+    var inputCls = "w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-brand";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email settings — Candace Holder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true" />
+</head>
+<body class="min-h-screen">
+
+<div class="hero-band">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+        <a href="/Admin" class="text-xs text-slate-500 hover:text-brand"><i class="fa-solid fa-arrow-left mr-1"></i>Admin</a>
+        <h1 class="text-2xl font-extrabold text-slate-50 mt-2">
+            <i class="fa-solid fa-envelope text-brand mr-2"></i>Email settings
+        </h1>
+        <p class="text-slate-400 text-sm mt-0.5">
+            The mail account the site sends from: password resets, team invites, and messages to users.
+        </p>
+    </div>
+</div>
+
+<div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+    @if (TempData["AdminOk"] != null)
+    {
+        <div class="rounded-xl border border-green-300 bg-green-50 text-green-800 px-4 py-3 text-sm">
+            <i class="fa-solid fa-circle-check mr-2"></i>@TempData["AdminOk"]
+        </div>
+    }
+    @if (TempData["AdminError"] != null)
+    {
+        <div class="rounded-xl border border-red-300 bg-red-50 text-red-800 px-4 py-3 text-sm break-words">
+            <i class="fa-solid fa-triangle-exclamation mr-2"></i>@TempData["AdminError"]
+        </div>
+    }
+
+    <!-- Presets -->
+    <div class="rounded-2xl border border-slate-700 bg-white p-5">
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Quick setup — pick your email provider</p>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" class="smtp-preset px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-semibold text-slate-200"
+                    data-host="smtp.gmail.com" data-port="587"
+                    data-tip="Gmail: username = your full Gmail address. Password = a 16-character App Password (Google Account → Security → 2-Step Verification → App passwords), not your normal password.">
+                <i class="fa-brands fa-google mr-1 text-red-500"></i>Gmail
+            </button>
+            <button type="button" class="smtp-preset px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-semibold text-slate-200"
+                    data-host="smtp.office365.com" data-port="587"
+                    data-tip="Outlook / Microsoft 365 (including Microsoft 365 email bought through GoDaddy): username = your full email address. Your admin may need to enable 'Authenticated SMTP' for the mailbox.">
+                <i class="fa-brands fa-microsoft mr-1 text-blue-600"></i>Outlook / Microsoft 365
+            </button>
+            <button type="button" class="smtp-preset px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-semibold text-slate-200"
+                    data-host="smtpout.secureserver.net" data-port="465"
+                    data-tip="GoDaddy Workspace Email (the older GoDaddy email): username = your full email address and its password. If your GoDaddy email is 'Microsoft 365 from GoDaddy', use the Outlook / Microsoft 365 button instead.">
+                <i class="fa-solid fa-globe mr-1 text-teal-600"></i>GoDaddy Workspace
+            </button>
+            <button type="button" class="smtp-preset px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-xs font-semibold text-slate-200"
+                    data-host="smtp-relay.brevo.com" data-port="587"
+                    data-tip="Brevo (free for 300 emails/day): username = the SMTP login shown under SMTP & API in Brevo; password = an SMTP key from that page. Verify your From address/domain in Brevo first.">
+                <i class="fa-solid fa-paper-plane mr-1 text-brand"></i>Brevo
+            </button>
+        </div>
+        <p id="presetTip" class="hidden mt-3 text-xs text-slate-300 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"></p>
+    </div>
+
+    <!-- Settings form -->
+    <form method="post" action="/Admin/Email" class="rounded-2xl border border-slate-700 bg-white p-5 space-y-4" autocomplete="off">
+        @Html.AntiForgeryToken()
+        <div class="flex items-center justify-between">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Mail server</p>
+            @if (isConfigured)
+            {
+                <span class="text-xs font-semibold text-green-700"><i class="fa-solid fa-circle-check mr-1"></i>Set up</span>
+            }
+            else
+            {
+                <span class="text-xs font-semibold text-orange-600"><i class="fa-solid fa-circle-exclamation mr-1"></i>Not set up</span>
+            }
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-2">
+                <label class="block text-xs text-slate-400 mb-1">SMTP server</label>
+                <input id="smtpHost" name="smtpHost" value="@V("Email:SmtpHost")" placeholder="smtp.example.com" class="@inputCls" />
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Port</label>
+                <input id="smtpPort" name="smtpPort" value="@V("Email:SmtpPort")" placeholder="587" inputmode="numeric" class="@inputCls" />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Username</label>
+                <input name="username" value="@V("Email:Username")" placeholder="you@example.com" class="@inputCls" autocomplete="off" />
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Password / app password</label>
+                <input name="password" type="password" placeholder="@(hasPassword ? "•••••••• (saved — leave blank to keep)" : "")" class="@inputCls" autocomplete="new-password" />
+                @if (hasPassword)
+                {
+                    <label class="mt-1.5 flex items-center gap-1.5 text-xs text-slate-400">
+                        <input type="checkbox" name="clearPassword" value="true" class="accent-pink-600" />Remove saved password
+                    </label>
+                }
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">From address</label>
+                <input name="fromAddress" value="@V("Email:FromAddress")" placeholder="hello@candaceholder.com" class="@inputCls" />
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">From name</label>
+                <input name="fromName" value="@V("Email:FromName")" placeholder="Candace Holder" class="@inputCls" />
+            </div>
+        </div>
+
+        <p class="text-xs text-slate-500">
+            Port 587 uses STARTTLS; 465 uses SSL. The password is stored encrypted and never shown again.
+            The From address usually has to match the account you log in with.
+        </p>
+
+        <div class="flex justify-end">
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-brand text-white text-sm font-bold shadow">
+                <i class="fa-solid fa-floppy-disk mr-1.5"></i>Save settings
+            </button>
+        </div>
+    </form>
+
+    <!-- Test -->
+    <form method="post" action="/Admin/Email/Test" class="rounded-2xl border border-slate-700 bg-white p-5">
+        @Html.AntiForgeryToken()
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Send a test email</p>
+        <div class="flex flex-col sm:flex-row gap-2">
+            <input name="to" value="@myEmail" placeholder="you@example.com" class="@inputCls" />
+            <button type="submit" class="shrink-0 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold">
+                <i class="fa-solid fa-paper-plane mr-1.5"></i>Send test
+            </button>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">Save your settings first. If it fails, the exact error from the mail server is shown above.</p>
+    </form>
+</div>
+
+<script src="~/js/admin-email.js" asp-append-version="true"></script>
+</body>
+</html>
