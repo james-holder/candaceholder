@@ -347,8 +347,9 @@ function closeNotes() {
     renderTable();
 }
 
-async function saveNotes(id) {
-    var ta   = document.getElementById('notesArea_' + id);
+// idPrefix: 'notesArea_' (desktop table) or 'mNotesArea_' (mobile card).
+async function saveNotes(id, idPrefix) {
+    var ta   = document.getElementById((idPrefix || 'notesArea_') + id);
     var text = ta ? (ta.value || '').trim() : null;
     try {
         var resp = await fetch('/Leads/' + id + '/Notes', {
@@ -520,10 +521,13 @@ function contactWarning(lead) {
 function startEdit(id) { editingNotesId = null; editingId = id; renderTable(); var i = document.getElementById('eName_' + id); if (i) i.focus(); }
 function cancelEdit()  { editingId = null; renderTable(); }
 
-async function saveOwner(id) {
-    var name  = (document.getElementById('eName_'  + id) || {}).value || null;
-    var phone = (document.getElementById('ePhone_' + id) || {}).value || null;
-    var email = (document.getElementById('eEmail_' + id) || {}).value || null;
+// prefix: 'e' = desktop table editor, 'm' = mobile card editor. Both are in
+// the page at once (one hidden), so each has its own element IDs.
+async function saveOwner(id, prefix) {
+    prefix = prefix || 'e';
+    var name  = ((document.getElementById(prefix + 'Name_'  + id) || {}).value || '').trim() || null;
+    var phone = ((document.getElementById(prefix + 'Phone_' + id) || {}).value || '').trim() || null;
+    var email = ((document.getElementById(prefix + 'Email_' + id) || {}).value || '').trim() || null;
     try {
         var resp = await fetch('/Leads/' + id + '/Owner', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ownerName:name, ownerPhone:phone, ownerEmail:email }) });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -629,12 +633,12 @@ function buildMobileCard(lead) {
         return '<div class="bg-slate-800 border border-brand/40 rounded-2xl p-4 shadow-md" data-lead-id="' + lead.id + '">' +
             '<p class="text-slate-50 font-semibold text-sm mb-3 truncate">' + escapeHtml(lead.address) + '</p>' +
             '<div class="space-y-2 mb-3">' +
-            '<input class="owner-input w-full" id="eName_'  + lead.id + '" value="' + escapeAttr(lead.ownerName  || '') + '" placeholder="Owner name" />' +
-            '<input class="owner-input w-full" id="ePhone_' + lead.id + '" value="' + escapeAttr(lead.ownerPhone || '') + '" placeholder="(555) 000-0000" />' +
-            '<input class="owner-input w-full" id="eEmail_' + lead.id + '" value="' + escapeAttr(lead.ownerEmail || '') + '" placeholder="owner@example.com" />' +
+            '<input class="owner-input w-full" id="mName_'  + lead.id + '" value="' + escapeAttr(lead.ownerName  || '') + '" placeholder="Owner name" />' +
+            '<input class="owner-input w-full" id="mPhone_' + lead.id + '" value="' + escapeAttr(lead.ownerPhone || '') + '" placeholder="(555) 000-0000" />' +
+            '<input class="owner-input w-full" id="mEmail_' + lead.id + '" value="' + escapeAttr(lead.ownerEmail || '') + '" placeholder="owner@example.com" />' +
             '</div>' +
             '<div class="flex gap-2">' +
-            '<button onclick="saveOwner(' + lead.id + ')" class="flex-1 py-2.5 rounded-xl bg-green-500/20 border border-green-500/30 text-green-600 text-sm font-semibold hover:bg-green-500/30 transition"><i class="fa-solid fa-check mr-1"></i>Save</button>' +
+            '<button onclick="saveOwner(' + lead.id + ', \'m\')" class="flex-1 py-2.5 rounded-xl bg-green-500/20 border border-green-500/30 text-green-600 text-sm font-semibold hover:bg-green-500/30 transition"><i class="fa-solid fa-check mr-1"></i>Save</button>' +
             '<button onclick="cancelEdit()" class="py-2.5 px-4 rounded-xl bg-slate-700 border border-slate-600 text-slate-300 text-sm font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-xmark"></i></button>' +
             '</div></div>';
     }
@@ -665,9 +669,9 @@ function buildMobileCard(lead) {
     const hasNotes = !!(lead.notes && lead.notes.trim());
     const notesSection = enotes
         ? '<div class="mt-3 pt-3 border-t border-slate-700/60 space-y-2">' +
-          '<textarea id="notesArea_' + lead.id + '" class="notes-textarea w-full" rows="3" placeholder="Add notes about this lead">' + escapeHtml(lead.notes || '') + '</textarea>' +
+          '<textarea id="mNotesArea_' + lead.id + '" class="notes-textarea w-full" rows="3" placeholder="Add notes about this lead">' + escapeHtml(lead.notes || '') + '</textarea>' +
           '<div class="flex gap-2">' +
-          '<button onclick="saveNotes(' + lead.id + ')" class="flex-1 py-2 rounded-xl bg-green-500/20 border border-green-500/30 text-green-600 text-xs font-semibold hover:bg-green-500/30 transition"><i class="fa-solid fa-check mr-1"></i>Save Note</button>' +
+          '<button onclick="saveNotes(' + lead.id + ', \'mNotesArea_\')" class="flex-1 py-2 rounded-xl bg-green-500/20 border border-green-500/30 text-green-600 text-xs font-semibold hover:bg-green-500/30 transition"><i class="fa-solid fa-check mr-1"></i>Save Note</button>' +
           '<button onclick="closeNotes()" class="py-2 px-3.5 rounded-xl bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-xmark"></i></button>' +
           '</div></div>'
         : '<div class="mt-3 pt-3 border-t border-slate-700/60">' +
