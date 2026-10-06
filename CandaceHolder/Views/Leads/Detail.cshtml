@@ -14,6 +14,7 @@
     var statusCssClass = "status-" + (statusCssMap.ContainsKey(Model.Status) ? statusCssMap[Model.Status] : "new");
     var canEnrich = (bool)(ViewBag.CanEnrich ?? false);
     var ownerPhoneContact = Model.Contacts.FirstOrDefault(c => c.Phone == Model.OwnerPhone);
+    var emailSends = ViewBag.EmailSends as List<CandaceHolder.Data.Models.EmailSend> ?? new();
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -477,6 +478,23 @@
                             </p>
                             <p class="text-slate-500 text-xs mt-0.5">@enrich.CreatedAt.ToString("MMM d, yyyy 'at' h:mm tt") UTC</p>
                             <p class="text-xs text-slate-600 mt-0.5">via @enrich.Provider</p>
+                        </div>
+                    </div>
+                }
+
+                <!-- Emails sent (newest first) -->
+                @foreach (var sent in emailSends) {
+                    var ok = sent.Status == "sent";
+                    <div class="timeline-item">
+                        <div class="timeline-dot @(ok ? "timeline-dot-enrich" : "timeline-dot-error")">
+                            <i class="fa-solid @(ok ? "fa-paper-plane" : "fa-xmark")"></i>
+                        </div>
+                        <div>
+                            <p class="text-slate-300 text-sm font-semibold">@(ok ? "Email sent" : "Email failed"): @sent.Subject</p>
+                            <p class="text-slate-500 text-xs mt-0.5">@sent.SentAt.ToString("MMM d, yyyy 'at' h:mm tt") UTC · to @sent.ToEmail</p>
+                            @if (!ok && !string.IsNullOrEmpty(sent.Error)) {
+                                <p class="text-xs text-red-600 mt-0.5">@sent.Error</p>
+                            }
                         </div>
                     </div>
                 }

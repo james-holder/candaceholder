@@ -17,6 +17,9 @@ namespace CandaceHolder.Data
         public DbSet<Enrichment>   Enrichments  => Set<Enrichment>();
         public DbSet<LeadContact>  LeadContacts => Set<LeadContact>();
         public DbSet<AppSetting>   AppSettings  => Set<AppSetting>();
+        public DbSet<EmailTemplate> EmailTemplates => Set<EmailTemplate>();
+        public DbSet<EmailSend>     EmailSends     => Set<EmailSend>();
+        public DbSet<EmailOptOut>   EmailOptOuts   => Set<EmailOptOut>();
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -165,6 +168,48 @@ namespace CandaceHolder.Data
                  .WithMany(l => l.Contacts)
                  .HasForeignKey(c => c.LeadId)
                  .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── Email templates / sends / opt-outs ───────────────────────
+            m.Entity<EmailTemplate>(e =>
+            {
+                e.ToTable("email_templates");
+                e.HasKey(t => t.Id);
+                e.Property(t => t.Id).HasColumnName("id");
+                e.Property(t => t.OrgId).HasColumnName("org_id");
+                e.Property(t => t.Name).HasColumnName("name").IsRequired();
+                e.Property(t => t.Subject).HasColumnName("subject").IsRequired();
+                e.Property(t => t.Body).HasColumnName("body").IsRequired();
+                e.Property(t => t.CreatedAt).HasColumnName("created_at");
+                e.Property(t => t.UpdatedAt).HasColumnName("updated_at");
+                e.HasIndex(t => t.OrgId);
+            });
+            m.Entity<EmailSend>(e =>
+            {
+                e.ToTable("email_sends");
+                e.HasKey(t => t.Id);
+                e.Property(t => t.Id).HasColumnName("id");
+                e.Property(t => t.OrgId).HasColumnName("org_id");
+                e.Property(t => t.LeadId).HasColumnName("lead_id");
+                e.Property(t => t.TemplateId).HasColumnName("template_id");
+                e.Property(t => t.UserId).HasColumnName("user_id");
+                e.Property(t => t.ToEmail).HasColumnName("to_email").IsRequired();
+                e.Property(t => t.Subject).HasColumnName("subject").IsRequired();
+                e.Property(t => t.Status).HasColumnName("status").IsRequired();
+                e.Property(t => t.Error).HasColumnName("error");
+                e.Property(t => t.SentAt).HasColumnName("sent_at");
+                e.HasIndex(t => t.LeadId);
+                e.HasIndex(t => t.OrgId);
+            });
+            m.Entity<EmailOptOut>(e =>
+            {
+                e.ToTable("email_opt_outs");
+                e.HasKey(t => t.Id);
+                e.Property(t => t.Id).HasColumnName("id");
+                e.Property(t => t.OrgId).HasColumnName("org_id");
+                e.Property(t => t.Email).HasColumnName("email").IsRequired();
+                e.Property(t => t.CreatedAt).HasColumnName("created_at");
+                e.HasIndex(t => new { t.OrgId, t.Email }).IsUnique();
             });
 
             // ── AppSetting ───────────────────────────────────────────────

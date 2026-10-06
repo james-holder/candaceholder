@@ -1,0 +1,199 @@
+@{
+    Layout = null;
+    var canEdit   = ViewBag.CanEdit is true;
+    var variables = CandaceHolder.Services.TemplateRenderer.Variables;
+}
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email Templates — Candace Holder</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/saved-leads.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true" />
+</head>
+<body class="min-h-screen">
+
+<!-- Toast -->
+<div id="toast">
+    <i id="toastIcon" class="fa-solid fa-circle-check"></i>
+    <span id="toastMsg"></span>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════════════════════ -->
+<header class="sticky top-0 z-50 bg-navy border-b border-slate-700/60 shadow-lg relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+
+        <a href="/" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <div class="w-8 h-8 brand-logo rounded-lg flex items-center justify-center shadow">
+                <i class="fa-solid fa-address-book text-slate-50 text-sm"></i>
+            </div>
+            <span class="text-lg font-bold tracking-tight">
+                Candace <span class="brand-text">Holder</span>
+            </span>
+        </a>
+
+        <nav class="hidden lg:flex items-center gap-6 text-sm text-slate-400">
+            <a href="/" class="hover:text-brand transition-colors">
+                <i class="fa-solid fa-magnifying-glass mr-1 text-xs"></i>Search
+            </a>
+            <a href="/Leads/Saved" class="hover:text-brand transition-colors">
+                <i class="fa-solid fa-bookmark mr-1 text-xs"></i>Saved Leads
+            </a>
+            <a href="/Dashboard" class="hover:text-brand transition-colors">Dashboard</a>
+            <a href="/Help" class="hover:text-brand transition-colors">
+                <i class="fa-solid fa-circle-question mr-1 text-xs"></i>Help
+            </a>
+            @if (User.FindFirst("admin_role")?.Value is "admin" or "super_admin" ||
+                 string.Equals(User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "", Configuration["AdminEmail"], System.StringComparison.OrdinalIgnoreCase)) {
+                <a href="/Admin" class="text-orange-600 hover:text-orange-700 transition-colors text-xs">
+                    <i class="fa-solid fa-shield-halved mr-1"></i>Admin
+                </a>
+            }
+            <span class="text-slate-600">|</span>
+            @await Html.PartialAsync("_AccountMenu")
+        </nav>
+
+        <!-- Hamburger (mobile only) -->
+        <button id="mobileMenuBtn" onclick="toggleMobileMenu()"
+            class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-brand hover:bg-slate-700/60 transition-colors">
+            <i id="mobileMenuIcon" class="fa-solid fa-bars text-lg"></i>
+        </button>
+    </div>
+
+    <!-- Mobile nav drawer -->
+    <div id="mobileMenu" class="hidden lg:hidden absolute top-full left-0 right-0 bg-navy border-t border-slate-700/60 shadow-2xl z-50 px-4 py-3 flex flex-col gap-1">
+        <a href="/" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-brand hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-magnifying-glass w-4 text-center text-xs"></i>Search
+        </a>
+        <a href="/Leads/Saved" class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-700/60 text-slate-50 font-semibold text-sm">
+            <i class="fa-solid fa-bookmark text-brand w-4 text-center text-xs"></i>Saved Leads
+        </a>
+        <a href="/Dashboard" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-brand hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-chart-bar w-4 text-center text-xs"></i>Dashboard
+        </a>
+        <a href="/Help" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-brand hover:bg-slate-700/60 transition-colors text-sm">
+            <i class="fa-solid fa-circle-question w-4 text-center text-xs"></i>Help
+        </a>
+        <div class="border-t border-slate-700/60 my-1"></div>
+        @await Html.PartialAsync("_AccountMenuMobile")
+    </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════
+     PAGE HERO
+══════════════════════════════════════════════════════════════ -->
+<div class="hero-band">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-extrabold text-slate-50 flex items-center gap-2">
+                <i class="fa-solid fa-envelope-open-text text-brand"></i>Email Templates
+            </h1>
+            <p class="text-slate-400 text-sm mt-0.5">
+                Write once, send to traced leads with their details filled in. Use these from the
+                <a href="/Leads/Saved" class="text-brand font-semibold hover:underline">Traced</a> tab.
+            </p>
+        </div>
+        @if (canEdit)
+        {
+            <button onclick="newTemplate()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand text-white text-xs font-semibold shadow">
+                <i class="fa-solid fa-plus"></i>New template
+            </button>
+        }
+    </div>
+</div>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
+
+    <!-- Template list -->
+    <aside>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Your templates</p>
+        <div id="templateList" class="space-y-2">
+            <p class="text-sm text-slate-500">Loading…</p>
+        </div>
+    </aside>
+
+    <!-- Editor + preview -->
+    <section id="editorPanel" class="hidden grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div class="rounded-2xl border border-slate-700 bg-white p-5 space-y-3">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Template name <span class="text-slate-500">(only you see this)</span></label>
+                <input id="tplName" maxlength="100" placeholder="e.g. First contact — homeowner"
+                       class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-brand" disabled="@(!canEdit)" />
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Subject</label>
+                <input id="tplSubject" maxlength="200" placeholder="e.g. Question about {{street}}"
+                       class="tpl-field w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-brand" disabled="@(!canEdit)" />
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Message</label>
+                <textarea id="tplBody" rows="12" placeholder="Hi {{first_name|there}},"
+                          class="tpl-field w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-brand leading-relaxed" disabled="@(!canEdit)"></textarea>
+            </div>
+
+            @if (canEdit)
+            {
+                <div>
+                    <p class="text-xs text-slate-400 mb-1.5">Insert a variable <span class="text-slate-500">(goes where your cursor is)</span></p>
+                    <div class="flex flex-wrap gap-1.5">
+                        @foreach (var v in variables)
+                        {
+                            <button type="button" class="var-chip px-2 py-1 rounded-lg bg-pink-50 border border-pink-200 text-pink-700 text-xs font-semibold hover:bg-pink-100"
+                                    data-var="@v.Name" title="@v.Description">{{@v.Name}}</button>
+                        }
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">
+                        Tip: add a fallback for missing info: <code class="bg-slate-900 px-1 rounded">{{first_name|there}}</code> becomes "there" when the
+                        name is unknown (for example when the owner is a company or trust).
+                    </p>
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <button onclick="saveTemplate()" id="saveBtn" class="px-5 py-2.5 rounded-xl bg-brand text-white text-sm font-bold shadow">
+                        <i class="fa-solid fa-floppy-disk mr-1.5"></i>Save
+                    </button>
+                    <button onclick="deleteTemplate()" id="deleteBtn" class="hidden px-4 py-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-semibold">
+                        <i class="fa-solid fa-trash mr-1"></i>Delete
+                    </button>
+                    <span id="saveState" class="text-xs text-slate-500 ml-auto"></span>
+                </div>
+            }
+        </div>
+
+        <div class="rounded-2xl border border-slate-700 bg-white p-5">
+            <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Preview <span class="normal-case font-normal text-slate-500">(sample lead "Jane Smith")</span></p>
+            <p id="addressWarning" class="hidden mb-3 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i>Add your business mailing address in
+                <a href="/Company/Settings" class="underline">Company Profile</a> before sending. It's required in every marketing email.
+            </p>
+            <div class="rounded-xl border border-slate-700 overflow-hidden">
+                <div class="px-4 py-2.5 bg-slate-900 border-b border-slate-700 text-xs">
+                    <p class="text-slate-500">To: <span id="pvTo" class="text-slate-300"></span></p>
+                    <p class="text-slate-500">Subject: <span id="pvSubject" class="font-semibold text-slate-50"></span></p>
+                </div>
+                <div id="pvBody" class="p-4 text-sm"></div>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">The footer (company, mailing address, unsubscribe link) is added to every email automatically.</p>
+        </div>
+    </section>
+
+    <section id="emptyPanel" class="rounded-2xl border border-dashed border-slate-600 bg-white/60 p-10 text-center text-slate-500">
+        <i class="fa-solid fa-envelope-open-text text-4xl text-pink-300 mb-3"></i>
+        <p class="font-semibold text-slate-300">Pick a template on the left@(canEdit ? ", or create a new one" : "").</p>
+    </section>
+</div>
+
+<script>window.CAN_EDIT = @(canEdit ? "true" : "false");</script>
+<script src="~/js/email-templates.js" asp-append-version="true"></script>
+<script src="~/js/mobile-menu.js" asp-append-version="true"></script>
+</body>
+</html>

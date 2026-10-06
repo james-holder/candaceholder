@@ -134,6 +134,45 @@ using (var scope = app.Services.CreateScope())
     AddColumnIfMissing("lead_contacts", "is_dnc",       "INTEGER NOT NULL DEFAULT 0");
     AddColumnIfMissing("lead_contacts", "is_litigator", "INTEGER NOT NULL DEFAULT 0");
 
+    // 2026-10-06: email templates, sends log and unsubscribe list
+    using (var cmd = conn.CreateCommand())
+    {
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS email_templates (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id     INTEGER NOT NULL,
+                name       TEXT NOT NULL,
+                subject    TEXT NOT NULL,
+                body       TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS IX_email_templates_org_id ON email_templates(org_id);
+            CREATE TABLE IF NOT EXISTS email_sends (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id      INTEGER NOT NULL,
+                lead_id     INTEGER NOT NULL,
+                template_id INTEGER,
+                user_id     INTEGER,
+                to_email    TEXT NOT NULL,
+                subject     TEXT NOT NULL,
+                status      TEXT NOT NULL,
+                error       TEXT,
+                sent_at     TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS IX_email_sends_lead_id ON email_sends(lead_id);
+            CREATE INDEX IF NOT EXISTS IX_email_sends_org_id  ON email_sends(org_id);
+            CREATE TABLE IF NOT EXISTS email_opt_outs (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id     INTEGER NOT NULL,
+                email      TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_email_opt_outs_org_id_email ON email_opt_outs(org_id, email);
+            """;
+        cmd.ExecuteNonQuery();
+    }
+
     // 2026-10-06: settings editable from Admin (Email settings)
     using (var cmd = conn.CreateCommand())
     {

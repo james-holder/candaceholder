@@ -84,6 +84,20 @@
         </ul>
     </section>
 
+    <section id="email" class="doc-section">
+        <h2 class="text-xl font-bold text-slate-50 mb-3"><i class="fa-solid fa-envelope-open-text text-brand mr-2"></i>5. Email traced leads</h2>
+        <ol class="list-decimal pl-6 space-y-2">
+            <li>Write a template under <b class="text-slate-50">Email Templates</b> (account menu, or the button on Saved Leads). Insert variables like
+                <code>{{first_name}}</code>, <code>{{property_address}}</code> or <code>{{sender_name}}</code>; the preview shows how it'll look.
+                Add a fallback for missing info: <code>{{first_name|there}}</code>.</li>
+            <li>On the <b class="text-slate-50">Traced</b> tab, tick the leads to email (up to 50 at a time) and click <b class="text-slate-50">Email</b>.</li>
+            <li>Pick the template, check the preview (it uses the first selected lead's real details), and send. Each person gets their own email.</li>
+        </ol>
+        <p class="mt-3 text-sm">Every email gets a footer with your company name, mailing address (from Company Profile) and an unsubscribe link, as the law requires.
+           People who unsubscribe are skipped automatically from then on, and nobody gets the same template twice. Sent emails show on each lead's Activity tab,
+           and new leads move to <b class="text-slate-50">Contacted</b>.</p>
+    </section>
+
     <section id="compliance" class="doc-section">
         <h2 class="text-xl font-bold text-slate-50 mb-3"><i class="fa-solid fa-shield-halved text-brand mr-2"></i>Before you call or text</h2>
         <p>BatchData flags Do Not Call numbers and known litigators, and leaves out numbers with TCPA restrictions. Still follow TCPA rules for texts and autodialed calls, and honor any opt-out request right away.</p>

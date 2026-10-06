@@ -73,7 +73,11 @@ namespace CandaceHolder.Controllers
 
             if (lead == null) return NotFound();
 
-            ViewBag.CanEnrich = CanEnrich;
+            ViewBag.CanEnrich  = CanEnrich;
+            ViewBag.EmailSends = await _db.EmailSends.AsNoTracking()
+                .Where(s => s.LeadId == lead.Id && s.OrgId == orgId)
+                .OrderByDescending(s => s.SentAt)
+                .ToListAsync();
             return View(lead);
         }
 

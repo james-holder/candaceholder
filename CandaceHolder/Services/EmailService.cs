@@ -112,6 +112,87 @@ namespace CandaceHolder.Services
             }
         }
 
+        /// <summary>One personalized email in a batch send.</summary>
+        public record OutgoingEmail(string To, string Subject, string Html, string Text, string? UnsubscribeUrl);
+
+        /// <summary>
+        /// Sends each email separately over one SMTP connection. Returns one entry
+        /// per email, in order: null = sent, otherwise the error message.
+        /// Adds List-Unsubscribe headers so mail apps show their own unsubscribe button.
+        /// </summary>
+        public async Task<List<string?>> SendManyAsync(IReadOnlyList<OutgoingEmail> emails)
+        {
+            var results = new List<string?>();
+            if (!IsConfigured)
+            {
+                results.AddRange(emails.Select(_ => (string?)"Email isn't set up (Admin → Email settings)."));
+                return results;
+            }
+
+            SmtpClient? client = null;
+            try
+            {
+                foreach (var e in emails)
+                {
+                    try
+                    {
+                        client ??= await ConnectAsync();
+
+                        var message = NewMessage(e.Subject, e.Html);
+                        message.To.Add(MailboxAddress.Parse(e.To));
+                        message.Body = new MultipartAlternative
+                        {
+                            new TextPart("plain") { Text = e.Text },
+                            new TextPart("html")  { Text = e.Html }
+                        };
+                        if (e.UnsubscribeUrl != null)
+                        {
+                            message.Headers.Add("List-Unsubscribe", $"<{e.UnsubscribeUrl}>");
+                            message.Headers.Add("List-Unsubscribe-Post", "List-Unsubscribe=One-Click");
+                        }
+
+                        await client.SendAsync(message);
+                        results.Add(null);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Batch email to {To} failed", e.To);
+                        results.Add(ex.Message);
+                        // Drop the connection so the next email starts fresh.
+                        try { if (client != null) await client.DisconnectAsync(true); } catch { }
+                        client?.Dispose();
+                        client = null;
+                    }
+                }
+            }
+            finally
+            {
+                if (client != null)
+                {
+                    try { await client.DisconnectAsync(true); } catch { }
+                    client.Dispose();
+                }
+            }
+
+            _logger.LogInformation("Batch email: {Sent}/{Total} sent", results.Count(r => r == null), emails.Count);
+            return results;
+        }
+
+        private async Task<SmtpClient> ConnectAsync()
+        {
+            var host     = _settings.Get("Email:SmtpHost")!;
+            var port     = int.TryParse(_settings.Get("Email:SmtpPort"), out var p) ? p : 587;
+            var username = _settings.Get("Email:Username") ?? "";
+            var password = _settings.Get("Email:Password") ?? "";
+
+            var client   = new SmtpClient { Timeout = 20000 };
+            var security = port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
+            await client.ConnectAsync(host, port, security);
+            if (!string.IsNullOrWhiteSpace(username))
+                await client.AuthenticateAsync(username, password);
+            return client;
+        }
+
         private MimeMessage NewMessage(string subject, string htmlBody)
         {
             var fromAddress = _settings.Get("Email:FromAddress")!;
@@ -127,16 +208,7 @@ namespace CandaceHolder.Services
         // Throws on failure — callers decide whether to swallow or report it.
         private async Task SendCoreAsync(MimeMessage message)
         {
-            var host     = _settings.Get("Email:SmtpHost")!;
-            var port     = int.TryParse(_settings.Get("Email:SmtpPort"), out var p) ? p : 587;
-            var username = _settings.Get("Email:Username") ?? "";
-            var password = _settings.Get("Email:Password") ?? "";
-
-            using var client = new SmtpClient { Timeout = 20000 };
-            var security = port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
-            await client.ConnectAsync(host, port, security);
-            if (!string.IsNullOrWhiteSpace(username))
-                await client.AuthenticateAsync(username, password);
+            using var client = await ConnectAsync();
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
         }

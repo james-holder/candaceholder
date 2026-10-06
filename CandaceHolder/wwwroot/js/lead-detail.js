@@ -54,14 +54,36 @@ function initPropertyMap() {
         return;
     }
     var map = L.map('propertyMap', { zoomControl: true, scrollWheelZoom: false }).setView([lat, lng], 18);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri', maxZoom: 20
-    }).addTo(map);
-    // World_Imagery has no place names — layer Esri's Boundaries_and_Places
-    // reference tiles (transparent, city/place labels only) on top.
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Labels &copy; Esri', maxZoom: 20
-    }).addTo(map);
+
+    // Satellite by default (Esri imagery + place labels), with a button to
+    // flip to Esri's street map — same pair as the search page, no API key.
+    var satellite = L.layerGroup([
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            { attribution: 'Tiles &copy; Esri', maxZoom: 20 }),
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+            { attribution: 'Labels &copy; Esri', maxZoom: 20 })
+    ]).addTo(map);
+    var street = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+        { attribution: 'Tiles &copy; Esri', maxZoom: 19 });
+
+    var isSatellite = true;
+    var toggle = L.control({ position: 'topright' });
+    toggle.onAdd = function () {
+        var div = L.DomUtil.create('div');
+        div.innerHTML = '<button type="button" title="Switch map style" style="background:#fff;border:1px solid #e9c6dc;color:#1f1235;' +
+            'padding:5px 10px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(31,18,53,0.15)">' +
+            '<i class="fa-solid fa-map"></i>&nbsp;Street</button>';
+        L.DomEvent.disableClickPropagation(div);
+        var btn = div.querySelector('button');
+        btn.addEventListener('click', function () {
+            isSatellite = !isSatellite;
+            if (isSatellite) { map.removeLayer(street); satellite.addTo(map); btn.innerHTML = '<i class="fa-solid fa-map"></i>&nbsp;Street'; }
+            else             { map.removeLayer(satellite); street.addTo(map); btn.innerHTML = '<i class="fa-solid fa-satellite"></i>&nbsp;Satellite'; }
+        });
+        return div;
+    };
+    toggle.addTo(map);
+
     L.marker([lat, lng]).addTo(map);
 }
 

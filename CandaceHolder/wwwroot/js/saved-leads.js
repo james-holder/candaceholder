@@ -159,6 +159,12 @@ function updateBulkToolbar() {
     var untraced  = selectedUntracedIds().length;
     enrichBtn.classList.toggle('hidden', !canEnrich || untraced === 0);
     enrichBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass-dollar"></i>Skip Trace ' + untraced;
+
+    // Email only makes sense for selected leads that have an email address
+    var emailBtn  = document.getElementById('btnBulkEmail');
+    var emailable = selectedEmailableLeads().length;
+    emailBtn.classList.toggle('hidden', !canEnrich || emailable === 0);
+    emailBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i>Email ' + emailable;
 }
 
 // ── Bulk actions ──────────────────────────────────────────────────
@@ -699,4 +705,107 @@ function showToast(msg, success) {
     toast.offsetHeight;
     toast.classList.add('show');
     _toastTimer = setTimeout(function() { toast.classList.remove('show'); }, 3500);
+}
+
+// ── Email selected leads (templates from /Email/Templates) ─────────
+var MAX_EMAILS_PER_SEND = 50;   // matches EmailController.MaxPerSend
+
+function selectedEmailableLeads() {
+    return allLeads.filter(function (l) { return selectedIds.has(l.id) && l.ownerEmail; });
+}
+
+async function openEmailModal() {
+    var leads = selectedEmailableLeads();
+    if (!leads.length) return;
+    document.getElementById('emailModal').classList.remove('hidden');
+
+    var resp = await fetch('/Email/Templates/List', { cache: 'no-store' });
+    var templates = resp.ok ? await resp.json() : [];
+    var none = templates.length === 0;
+    document.getElementById('emailNoTemplates').classList.toggle('hidden', !none);
+    document.getElementById('emailPickRow').classList.toggle('hidden', none);
+    document.getElementById('emailPreviewBox').classList.toggle('hidden', none);
+    document.getElementById('emailSendBtn').disabled = none;
+
+    var sel = document.getElementById('emailTemplateSelect');
+    sel.innerHTML = templates.map(function (t) {
+        return '<option value="' + t.id + '">' + escapeHtml(t.name) + '</option>';
+    }).join('');
+    sel._templates = templates;
+
+    var skipped = selectedIds.size - leads.length;
+    var over    = leads.length > MAX_EMAILS_PER_SEND;
+    document.getElementById('emailCounts').innerHTML =
+        '<b class="text-slate-200">' + leads.length + '</b> selected lead' + (leads.length === 1 ? ' has' : 's have') + ' an email address' +
+        (skipped ? ' (' + skipped + ' without one will be skipped)' : '') + '.' +
+        (over ? ' <span class="text-red-600 font-semibold">Select ' + MAX_EMAILS_PER_SEND + ' or fewer per send.</span>' : '');
+    document.getElementById('emailSendBtn').disabled = none || over;
+    document.getElementById('emailSendBtn').innerHTML =
+        '<i class="fa-solid fa-paper-plane mr-1.5"></i>Send to ' + Math.min(leads.length, MAX_EMAILS_PER_SEND);
+
+    if (!none) previewEmail();
+}
+
+function closeEmailModal() {
+    document.getElementById('emailModal').classList.add('hidden');
+}
+
+// Preview with the first selected lead's real details.
+async function previewEmail() {
+    var sel  = document.getElementById('emailTemplateSelect');
+    var t    = (sel._templates || []).find(function (x) { return String(x.id) === sel.value; });
+    var lead = selectedEmailableLeads()[0];
+    if (!t || !lead) return;
+
+    var resp = await fetch('/Email/Preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: t.subject, body: t.body, leadId: lead.id })
+    });
+    if (!resp.ok) return;
+    var p = await resp.json();
+    document.getElementById('emailPvLead').textContent    = lead.ownerName || lead.address;
+    document.getElementById('emailPvTo').textContent      = p.to || '';
+    document.getElementById('emailPvSubject').textContent = p.subject || '';
+    document.getElementById('emailPvBody').innerHTML      = p.html;   // server-rendered; values HTML-encoded
+    document.getElementById('emailAddressWarning').classList.toggle('hidden', !p.missingAddress);
+    if (p.missingAddress) document.getElementById('emailSendBtn').disabled = true;
+}
+
+async function sendEmails() {
+    var leads = selectedEmailableLeads();
+    var templateId = parseInt(document.getElementById('emailTemplateSelect').value, 10);
+    if (!leads.length || !templateId) return;
+    if (!confirm('Send this email to ' + leads.length + ' lead' + (leads.length === 1 ? '' : 's') + '?')) return;
+
+    var btn = document.getElementById('emailSendBtn');
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1.5"></i>Sending…';
+    try {
+        var resp = await fetch('/Email/Send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ templateId: templateId, leadIds: leads.map(function (l) { return l.id; }) })
+        });
+        var r = await resp.json();
+        if (!resp.ok) throw new Error(r.error || 'HTTP ' + resp.status);
+
+        var notes = [];
+        if (r.skippedDuplicate) notes.push(r.skippedDuplicate + ' already got this template');
+        if (r.skippedOptOut)    notes.push(r.skippedOptOut + ' unsubscribed');
+        if (r.noEmail)          notes.push(r.noEmail + ' had no valid email');
+        if (r.failed && r.failed.length) notes.push(r.failed.length + ' failed');
+        showToast('Sent ' + r.sent + ' email' + (r.sent === 1 ? '' : 's') + (notes.length ? ' (' + notes.join(', ') + ')' : ''),
+                  r.sent > 0 && !(r.failed && r.failed.length));
+        closeEmailModal();
+        clearSelection();
+        await loadLeads();
+        refreshTabCounts();
+    } catch (e) {
+        showToast('Send failed: ' + e.message, false);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+    }
 }

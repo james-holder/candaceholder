@@ -1,0 +1,47 @@
+@{
+    Layout = null;
+    var valid = ViewBag.Valid is true;
+    var done  = ViewBag.Done is true;
+    var email = ViewBag.Email as string ?? "";
+    var token = ViewBag.Token as string ?? "";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Unsubscribe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true" />
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-2xl border border-slate-700 shadow-xl p-8 text-center">
+        @if (!valid)
+        {
+            <i class="fa-solid fa-circle-xmark text-4xl text-red-500 mb-3"></i>
+            <h1 class="text-xl font-bold text-slate-50 mb-2">This link isn't valid</h1>
+            <p class="text-sm text-slate-400">Reply to the email you received and ask to be removed, and we'll take care of it.</p>
+        }
+        else if (done)
+        {
+            <i class="fa-solid fa-circle-check text-4xl text-teal-600 mb-3"></i>
+            <h1 class="text-xl font-bold text-slate-50 mb-2">You're unsubscribed</h1>
+            <p class="text-sm text-slate-400"><b class="text-slate-200">@email</b> won't receive any more of these emails.</p>
+        }
+        else
+        {
+            <i class="fa-solid fa-envelope-circle-check text-4xl text-brand mb-3"></i>
+            <h1 class="text-xl font-bold text-slate-50 mb-2">Unsubscribe?</h1>
+            <p class="text-sm text-slate-400 mb-6">Stop sending emails to <b class="text-slate-200">@email</b>.</p>
+            <form method="post" action="/u/@token">
+                <button type="submit" class="w-full px-5 py-3 rounded-xl bg-brand text-white text-sm font-bold">
+                    Unsubscribe
+                </button>
+            </form>
+        }
+    </div>
+</body>
+</html>

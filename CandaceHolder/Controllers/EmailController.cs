@@ -1,0 +1,316 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using CandaceHolder.Data;
+using CandaceHolder.Data.Models;
+using CandaceHolder.Services;
+using System.Security.Claims;
+using System.Text.Json.Serialization;
+
+namespace CandaceHolder.Controllers
+{
+    /// <summary>
+    /// Email templates and sending them to traced leads. Every email gets a
+    /// footer with the business mailing address and an unsubscribe link, and
+    /// opted-out addresses are always skipped (CAN-SPAM).
+    /// </summary>
+    [Authorize]
+    [Route("[controller]")]
+    public class EmailController : Controller
+    {
+        // Keep batches small: Gmail allows ~500 recipients/day, and smaller
+        // sends make a bad template easier to catch before it goes to everyone.
+        public const int MaxPerSend = 50;
+
+        private readonly AppDbContext          _db;
+        private readonly EmailService          _email;
+        private readonly IDataProtector        _unsubTokens;
+        private readonly ILogger<EmailController> _logger;
+
+        public EmailController(AppDbContext db, EmailService email, IDataProtectionProvider dp, ILogger<EmailController> logger)
+        {
+            _db          = db;
+            _email       = email;
+            _unsubTokens = dp.CreateProtector("CandaceHolder.Unsubscribe");
+            _logger      = logger;
+        }
+
+        private long? CurrentOrgId  => long.TryParse(User.FindFirst("user_org_id")?.Value, out var id) ? id : null;
+        private long? CurrentUserId => long.TryParse(User.FindFirst("user_db_id")?.Value, out var id) ? id : null;
+        // Same rule as skip tracing: owners and managers.
+        private bool  CanSend       => User.FindFirst("user_org_role")?.Value is "owner" or "manager";
+
+        // ── GET /Email/Templates — editor page ───────────────────────
+        [HttpGet("Templates")]
+        public IActionResult Templates()
+        {
+            ViewBag.CanEdit = CanSend;
+            return View();
+        }
+
+        // ── GET /Email/Templates/List ────────────────────────────────
+        [HttpGet("Templates/List")]
+        public async Task<IActionResult> ListTemplates()
+        {
+            var orgId = CurrentOrgId;
+            var list = await _db.EmailTemplates.AsNoTracking()
+                .Where(t => t.OrgId == orgId)
+                .OrderBy(t => t.Name)
+                .Select(t => new { t.Id, t.Name, t.Subject, t.Body, t.UpdatedAt })
+                .ToListAsync();
+            return Json(list);
+        }
+
+        // ── POST /Email/Templates/Save ───────────────────────────────
+        [HttpPost("Templates/Save")]
+        public async Task<IActionResult> SaveTemplate([FromBody] TemplateDto dto)
+        {
+            if (!CanSend) return StatusCode(403, new { error = "Only owners and managers can edit templates." });
+            var orgId = CurrentOrgId;
+            if (orgId == null) return BadRequest(new { error = "No team found for your account." });
+
+            var name    = (dto.Name ?? "").Trim();
+            var subject = (dto.Subject ?? "").Trim();
+            var body    = (dto.Body ?? "").Trim();
+            if (name.Length == 0 || subject.Length == 0 || body.Length == 0)
+                return BadRequest(new { error = "Name, subject and message are all required." });
+            if (name.Length > 100 || subject.Length > 200 || body.Length > 20000)
+                return BadRequest(new { error = "That template is too long." });
+
+            EmailTemplate? t;
+            if (dto.Id is long id)
+            {
+                t = await _db.EmailTemplates.FirstOrDefaultAsync(x => x.Id == id && x.OrgId == orgId);
+                if (t == null) return NotFound(new { error = "Template not found." });
+            }
+            else
+            {
+                t = new EmailTemplate { OrgId = orgId.Value, CreatedAt = DateTime.UtcNow };
+                _db.EmailTemplates.Add(t);
+            }
+            t.Name = name; t.Subject = subject; t.Body = body; t.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return Json(new { t.Id, t.Name, t.Subject, t.Body, t.UpdatedAt });
+        }
+
+        // ── DELETE /Email/Templates/{id} ─────────────────────────────
+        [HttpDelete("Templates/{id:long}")]
+        public async Task<IActionResult> DeleteTemplate(long id)
+        {
+            if (!CanSend) return StatusCode(403, new { error = "Only owners and managers can delete templates." });
+            var orgId = CurrentOrgId;
+            var t = await _db.EmailTemplates.FirstOrDefaultAsync(x => x.Id == id && x.OrgId == orgId);
+            if (t == null) return NotFound(new { error = "Template not found." });
+            _db.EmailTemplates.Remove(t);
+            await _db.SaveChangesAsync();
+            return Json(new { deleted = true });
+        }
+
+        // ── POST /Email/Preview ──────────────────────────────────────
+        // Renders a subject/body for one lead (or sample data) exactly as it
+        // would be sent, footer included.
+        [HttpPost("Preview")]
+        public async Task<IActionResult> Preview([FromBody] PreviewDto dto)
+        {
+            var orgId = CurrentOrgId;
+            var org   = await _db.Orgs.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orgId);
+
+            Lead? lead = null;
+            if (dto.LeadId is long leadId)
+                lead = await _db.Leads.AsNoTracking().FirstOrDefaultAsync(l => l.Id == leadId && l.OrgId == orgId);
+
+            var ctx = lead != null
+                ? ContextFor(lead, org)
+                : new TemplateRenderer.Context("Jane Smith", "jane.smith@example.com",
+                      "123 Main Street, Dallas, TX 75201", SenderName, CompanyName(org));
+
+            var subject = TemplateRenderer.Render(dto.Subject ?? "", ctx);
+            var body    = TemplateRenderer.Render(dto.Body ?? "", ctx);
+            var (html, _) = WithFooter(body, org, "#unsubscribe-link-preview");
+
+            return Json(new { subject, html, to = ctx.Email, missingAddress = string.IsNullOrWhiteSpace(org?.Address) });
+        }
+
+        // ── POST /Email/Send ─────────────────────────────────────────
+        [HttpPost("Send")]
+        public async Task<IActionResult> Send([FromBody] SendDto dto)
+        {
+            if (!CanSend) return StatusCode(403, new { error = "Only owners and managers can send email." });
+            if (!_email.IsConfigured) return BadRequest(new { error = "Email isn't set up yet (Admin → Email settings)." });
+            if (dto.LeadIds == null || dto.LeadIds.Length == 0) return BadRequest(new { error = "No leads selected." });
+            if (dto.LeadIds.Length > MaxPerSend)
+                return BadRequest(new { error = $"Send to at most {MaxPerSend} leads at a time." });
+
+            var orgId = CurrentOrgId;
+            var org   = await _db.Orgs.FirstOrDefaultAsync(o => o.Id == orgId);
+            if (org == null) return BadRequest(new { error = "No team found for your account." });
+            if (string.IsNullOrWhiteSpace(org.Address))
+                return BadRequest(new { error = "Add your business mailing address in Company Profile first — the law (CAN-SPAM) requires it in every marketing email." });
+
+            var template = await _db.EmailTemplates.FirstOrDefaultAsync(t => t.Id == dto.TemplateId && t.OrgId == orgId);
+            if (template == null) return NotFound(new { error = "Template not found." });
+
+            var leads = await _db.Leads
+                .Where(l => dto.LeadIds.Contains(l.Id) && l.OrgId == orgId && l.DeletedAt == null)
+                .ToListAsync();
+
+            var optedOut = (await _db.EmailOptOuts.Where(o => o.OrgId == orgId).Select(o => o.Email).ToListAsync())
+                           .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var alreadySent = (await _db.EmailSends
+                    .Where(s => s.OrgId == orgId && s.TemplateId == template.Id && s.Status == "sent" && dto.LeadIds.Contains(s.LeadId))
+                    .Select(s => s.LeadId).ToListAsync())
+                .ToHashSet();
+
+            int noEmail = 0, skippedOptOut = 0, skippedDuplicate = 0;
+            var batch = new List<(Lead Lead, EmailService.OutgoingEmail Email)>();
+            foreach (var lead in leads)
+            {
+                var to = lead.OwnerEmail?.Trim();
+                if (string.IsNullOrWhiteSpace(to) || !System.Net.Mail.MailAddress.TryCreate(to, out _)) { noEmail++; continue; }
+                if (optedOut.Contains(to))                                  { skippedOptOut++; continue; }
+                if (!dto.AllowRepeat && alreadySent.Contains(lead.Id))       { skippedDuplicate++; continue; }
+
+                var ctx     = ContextFor(lead, org);
+                var subject = TemplateRenderer.Render(template.Subject, ctx);
+                var body    = TemplateRenderer.Render(template.Body, ctx);
+                var unsub   = UnsubscribeUrl(org.Id, to);
+                var (html, text) = WithFooter(body, org, unsub);
+                batch.Add((lead, new EmailService.OutgoingEmail(to, subject, html, text, unsub)));
+            }
+
+            var results = await _email.SendManyAsync(batch.Select(b => b.Email).ToList());
+
+            var failures = new List<object>();
+            for (int i = 0; i < batch.Count; i++)
+            {
+                var (lead, email) = batch[i];
+                var error = results[i];
+                _db.EmailSends.Add(new EmailSend
+                {
+                    OrgId = org.Id, LeadId = lead.Id, TemplateId = template.Id, UserId = CurrentUserId,
+                    ToEmail = email.To, Subject = email.Subject,
+                    Status = error == null ? "sent" : "failed", Error = error, SentAt = DateTime.UtcNow
+                });
+                if (error == null && (lead.Status == "new" || lead.Status == null))
+                    lead.Status = "contacted";
+                if (error != null) failures.Add(new { address = lead.Address, error });
+            }
+            await _db.SaveChangesAsync();
+
+            var sent = results.Count(r => r == null);
+            _logger.LogInformation("Template {TemplateId} sent to {Sent}/{Total} lead(s) by user {UserId}",
+                template.Id, sent, leads.Count, CurrentUserId);
+
+            return Json(new { sent, noEmail, skippedOptOut, skippedDuplicate, failed = failures });
+        }
+
+        // ── GET /Email/Unsubscribe/{token} — public ──────────────────
+        [HttpGet("~/u/{token}")]
+        [AllowAnonymous]
+        public IActionResult Unsubscribe(string token)
+        {
+            ViewBag.Valid = TryReadToken(token, out _, out var email);
+            ViewBag.Email = email;
+            ViewBag.Token = token;
+            return View();
+        }
+
+        // ── POST /u/{token} — confirm (also mail apps' one-click unsubscribe) ─
+        [HttpPost("~/u/{token}")]
+        [AllowAnonymous]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> UnsubscribeConfirm(string token)
+        {
+            if (!TryReadToken(token, out var orgId, out var email))
+            {
+                ViewBag.Valid = false;
+                return View("Unsubscribe");
+            }
+
+            var normalized = email.ToLowerInvariant();
+            if (!await _db.EmailOptOuts.AnyAsync(o => o.OrgId == orgId && o.Email == normalized))
+            {
+                _db.EmailOptOuts.Add(new EmailOptOut { OrgId = orgId, Email = normalized, CreatedAt = DateTime.UtcNow });
+                await _db.SaveChangesAsync();
+                _logger.LogInformation("Email opt-out recorded for org {OrgId}", orgId);
+            }
+
+            ViewBag.Valid = true;
+            ViewBag.Done  = true;
+            ViewBag.Email = email;
+            return View("Unsubscribe");
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────
+        private string? SenderName => User.FindFirst(ClaimTypes.Name)?.Value;
+
+        private static string? CompanyName(Data.Models.Org? org) =>
+            string.IsNullOrWhiteSpace(org?.CompanyName) ? org?.Name : org.CompanyName;
+
+        private TemplateRenderer.Context ContextFor(Lead lead, Data.Models.Org? org) =>
+            new(lead.OwnerName, lead.OwnerEmail, lead.Address, SenderName, CompanyName(org));
+
+        // Appends the required footer: who it's from, mailing address, unsubscribe.
+        private static (string Html, string Text) WithFooter(string body, Data.Models.Org? org, string unsubscribeUrl)
+        {
+            var company = CompanyName(org) ?? "";
+            var address = org?.Address?.Trim() ?? "";
+
+            var text = body +
+                       "\n\n--\n" + company + (address.Length > 0 ? "\n" + address : "") +
+                       "\nDon't want these emails? Unsubscribe: " + unsubscribeUrl;
+
+            var html =
+                "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1f1235\">" +
+                TemplateRenderer.ToHtml(body) + "</div>" +
+                "<hr style=\"border:0;border-top:1px solid #e5e7eb;margin:24px 0 12px\">" +
+                "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6b7280;line-height:1.5\">" +
+                System.Net.WebUtility.HtmlEncode(company) +
+                (address.Length > 0 ? "<br>" + System.Net.WebUtility.HtmlEncode(address).Replace("\n", "<br>") : "") +
+                "<br>Don't want these emails? <a href=\"" + unsubscribeUrl + "\" style=\"color:#6b7280\">Unsubscribe</a>" +
+                "</div>";
+            return (html, text);
+        }
+
+        private string UnsubscribeUrl(long orgId, string email) =>
+            $"{Request.Scheme}://{Request.Host}/u/{_unsubTokens.Protect($"{orgId}|{email.ToLowerInvariant()}")}";
+
+        private bool TryReadToken(string token, out long orgId, out string email)
+        {
+            orgId = 0; email = "";
+            try
+            {
+                var parts = _unsubTokens.Unprotect(token).Split('|', 2);
+                if (parts.Length != 2 || !long.TryParse(parts[0], out orgId)) return false;
+                email = parts[1];
+                return true;
+            }
+            catch { return false; }
+        }
+
+        // ── DTOs ─────────────────────────────────────────────────────
+        public class TemplateDto
+        {
+            [JsonPropertyName("id")]      public long?   Id      { get; set; }
+            [JsonPropertyName("name")]    public string? Name    { get; set; }
+            [JsonPropertyName("subject")] public string? Subject { get; set; }
+            [JsonPropertyName("body")]    public string? Body    { get; set; }
+        }
+
+        public class PreviewDto
+        {
+            [JsonPropertyName("subject")] public string? Subject { get; set; }
+            [JsonPropertyName("body")]    public string? Body    { get; set; }
+            [JsonPropertyName("leadId")]  public long?   LeadId  { get; set; }
+        }
+
+        public class SendDto
+        {
+            [JsonPropertyName("templateId")]  public long    TemplateId  { get; set; }
+            [JsonPropertyName("leadIds")]     public long[]? LeadIds     { get; set; }
+            /// <summary>Send even to leads that already got this template.</summary>
+            [JsonPropertyName("allowRepeat")] public bool    AllowRepeat { get; set; }
+        }
+    }
+}
