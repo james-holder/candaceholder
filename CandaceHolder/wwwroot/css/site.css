@@ -8,25 +8,25 @@
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
-    background: #0f172a;
-    color: #e2e8f0;
+    background: #fbf8fd;
+    color: #1f1235;
     font-family: ui-sans-serif, system-ui, sans-serif;
     margin: 0;
 }
 
 /* ── Stat cards (Dashboard + Admin) ──────────────────────── */
 .stat-card {
-    background: #1e293b;
-    border: 1px solid rgba(51,65,85,0.6);
+    background: #ffffff;
+    border: 1px solid rgba(217,209,227,0.8);
     border-radius: 1rem;
     padding: 1.5rem;
     transition: border-color 0.2s;
 }
-.stat-card:hover { border-color: rgba(249,115,22,0.4); }
+.stat-card:hover { border-color: rgba(225,29,116,0.4); }
 
 /* ── Filter buttons ──────────────────────────────────────── */
 .filter-btn { transition: background 0.15s, color 0.15s; }
-.filter-btn.active { background: #f97316; color: #fff; }
+.filter-btn.active { background: #e11d74; color: #fff; }
 
 /* ── Scan button progress bar ────────────────────────────── */
 #scanProgressBar {
@@ -63,7 +63,7 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    box-shadow: 0 8px 32px rgba(31,18,53,0.12);
     transform: translateY(80px);
     opacity: 0;
     transition: transform 0.3s ease, opacity 0.3s ease;
@@ -83,10 +83,10 @@ body {
     left: 0;
     right: 0;
     z-index: 60;
-    background: #1e293b;
-    border: 1px solid #475569;
+    background: #ffffff;
+    border: 1px solid #d9d1e3;
     border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    box-shadow: 0 8px 24px rgba(31,18,53,0.12);
     overflow: hidden;
 }
 .address-suggestion {
@@ -95,16 +95,16 @@ body {
     gap: 8px;
     padding: 10px 14px;
     font-size: 13px;
-    color: #cbd5e1;
+    color: #4a3f5e;
     cursor: pointer;
 }
-.address-suggestion i { color: #64748b; font-size: 11px; }
+.address-suggestion i { color: #7c7590; font-size: 11px; }
 .address-suggestion:hover,
-.address-suggestion.active { background: #334155; color: #fff; }
+.address-suggestion.active { background: #ece6f3; color: #fff; }
 
 /* ── Home page: hero gradient ────────────────────────────── */
 .hero-gradient {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    background: linear-gradient(135deg, #fbf8fd 0%, #ffffff 50%, #fbf8fd 100%);
 }
 
 /* ── Home page: property cards ───────────────────────────── */
@@ -113,18 +113,18 @@ body {
     border: 1.5px solid transparent;
 }
 .prop-card:hover {
-    box-shadow: 0 0 0 2px #f97316, 0 8px 24px rgba(0,0,0,0.45);
+    box-shadow: 0 0 0 2px #e11d74, 0 8px 24px rgba(31,18,53,0.12);
     transform: translateY(-2px);
-    border-color: #f97316;
+    border-color: #e11d74;
 }
 .prop-card.highlighted {
-    border-color: #f97316;
-    box-shadow: 0 0 0 2px #f97316, 0 8px 32px rgba(249,115,22,0.25);
+    border-color: #e11d74;
+    box-shadow: 0 0 0 2px #e11d74, 0 8px 32px rgba(225,29,116,0.25);
 }
-.prop-card.selected { border-color: #f97316; background: rgba(249,115,22,0.06); }
+.prop-card.selected { border-color: #e11d74; background: rgba(225,29,116,0.06); }
 
 /* ── Home page: lead checkboxes ──────────────────────────── */
-.lead-check { accent-color: #f97316; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+.lead-check { accent-color: #e11d74; width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
 
 /* ── Home page: summary count badges ────────────────────── */
 .summary-badge { transition: transform 0.2s; }
@@ -132,9 +132,9 @@ body {
 
 /* ── Home page: card list scrollbar ─────────────────────── */
 .card-scroll::-webkit-scrollbar       { width: 6px; }
-.card-scroll::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
-.card-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-.card-scroll::-webkit-scrollbar-thumb:hover { background: #f97316; }
+.card-scroll::-webkit-scrollbar-track { background: #ffffff; border-radius: 4px; }
+.card-scroll::-webkit-scrollbar-thumb { background: #d9d1e3; border-radius: 4px; }
+.card-scroll::-webkit-scrollbar-thumb:hover { background: #e11d74; }
 
 /* ── Leaflet marker override ─────────────────────────────── */
 .leaflet-div-icon { background: transparent; border: none; }

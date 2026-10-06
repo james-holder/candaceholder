@@ -13,9 +13,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Create your account — Candace Holder</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="~/css/site.css" />
     <link rel="stylesheet" href="~/css/login.css" />
+    <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true" />
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
@@ -24,11 +26,11 @@
     <!-- Logo -->
     <div class="text-center mb-8">
         <div class="inline-flex items-center gap-2.5 mb-4">
-            <div class="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
-                <i class="fa-solid fa-address-book text-white"></i>
+            <div class="w-10 h-10 brand-logo rounded-xl flex items-center justify-center shadow-lg">
+                <i class="fa-solid fa-address-book text-slate-50"></i>
             </div>
-            <span class="text-2xl font-extrabold text-white tracking-tight">
-                Candace <span class="text-orange-500">Holder</span>
+            <span class="text-2xl font-extrabold text-slate-50 tracking-tight">
+                Candace <span class="brand-text">Holder</span>
             </span>
         </div>
         <p class="text-slate-400 text-sm">Find addresses and skip trace property owners</p>
@@ -37,11 +39,11 @@
     <!-- Card -->
     <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-8 shadow-2xl">
 
-        <h2 class="text-white font-bold text-lg mb-6 text-center">Create your account</h2>
+        <h2 class="text-slate-50 font-bold text-lg mb-6 text-center">Create your account</h2>
 
         @if (registerError != null)
         {
-            <div class="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm text-center mb-4">
+            <div class="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-600 text-sm text-center mb-4">
                 <i class="fa-solid fa-circle-exclamation mr-1"></i>@registerError
             </div>
         }
@@ -51,20 +53,20 @@
             @if (ViewData["RegistrationClosed"] is true)
             {
                 <p class="text-xs text-slate-400 bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3">
-                    <i class="fa-solid fa-lock mr-1 text-orange-400"></i>
+                    <i class="fa-solid fa-lock mr-1 text-brand"></i>
                     Sign-ups are invite-only. Only the site owner's admin email can register here.
                 </p>
             }
 
             <input type="text" name="companyName" placeholder="Company name" value="@companyName"
-                   class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-orange-500 transition" required />
+                   class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-slate-50 text-sm placeholder-slate-500 focus:outline-none focus:border-brand transition" required />
             <input type="text" name="name" placeholder="Your name" value="@name"
-                   class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-orange-500 transition" required />
+                   class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-slate-50 text-sm placeholder-slate-500 focus:outline-none focus:border-brand transition" required />
             <input type="email" name="email" placeholder="Email" value="@email"
-                   class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-orange-500 transition" required />
+                   class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 text-slate-50 text-sm placeholder-slate-500 focus:outline-none focus:border-brand transition" required />
             <div class="relative">
                 <input type="password" id="regPwd" name="password" placeholder="Password (min. 8 characters)"
-                       class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 pr-11 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-orange-500 transition" required minlength="8" />
+                       class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 pr-11 text-slate-50 text-sm placeholder-slate-500 focus:outline-none focus:border-brand transition" required minlength="8" />
                 <button type="button" onclick="togglePwd('regPwd', this)"
                         class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition">
                     <i class="fa-solid fa-eye text-sm"></i>
@@ -72,21 +74,21 @@
             </div>
             <div class="relative">
                 <input type="password" id="regPwdConfirm" name="confirmPassword" placeholder="Confirm password"
-                       class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 pr-11 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-orange-500 transition" required minlength="8" />
+                       class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-4 py-3 pr-11 text-slate-50 text-sm placeholder-slate-500 focus:outline-none focus:border-brand transition" required minlength="8" />
                 <button type="button" onclick="togglePwd('regPwdConfirm', this)"
                         class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition">
                     <i class="fa-solid fa-eye text-sm"></i>
                 </button>
             </div>
             <button type="submit"
-                    class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl px-4 py-3 text-sm transition">
+                    class="w-full bg-brand hover:bg-brand-dark text-white font-semibold rounded-xl px-4 py-3 text-sm transition">
                 Create account
             </button>
         </form>
 
         <p class="text-center text-slate-400 text-xs mt-5">
             Already have an account?
-            <a href="/Auth/Login?returnUrl=@Uri.EscapeDataString(returnUrl)" class="text-orange-400 hover:text-orange-300 font-medium">Sign in</a>
+            <a href="/Auth/Login?returnUrl=@Uri.EscapeDataString(returnUrl)" class="text-brand hover:text-orange-700 font-medium">Sign in</a>
         </p>
 
     </div>

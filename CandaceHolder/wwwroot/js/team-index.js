@@ -11,7 +11,7 @@
 function showToast(msg, ok = true) {
     const t = document.getElementById('toast');
     t.textContent = msg;
-    t.className = `fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-xl transition-all ${ok ? 'bg-green-900/90 border border-green-700 text-green-200' : 'bg-red-900/90 border border-red-700 text-red-200'}`;
+    t.className = `fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-xl transition-all ${ok ? 'bg-green-900/90 border border-green-700 text-green-700' : 'bg-red-900/90 border border-red-700 text-red-700'}`;
     t.classList.remove('hidden');
     setTimeout(() => t.classList.add('hidden'), 4000);
 }
@@ -19,7 +19,7 @@ function showToast(msg, ok = true) {
 function roleBadge(role) {
     const colors = {
         owner:   'bg-brand/20 text-brand border-brand/30',
-        manager: 'bg-purple-900/40 text-purple-300 border-purple-700/40',
+        manager: 'bg-purple-900/40 text-purple-700 border-purple-700/40',
         rep:     'bg-slate-700/60 text-slate-300 border-slate-600'
     };
     const c = colors[role] || colors.rep;
@@ -45,7 +45,7 @@ async function loadMembers() {
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-sm font-medium text-white">${esc(m.name)}</span>
+                        <span class="text-sm font-medium text-slate-50">${esc(m.name)}</span>
                         ${m.isMe ? '<span class="text-xs text-slate-500">(you)</span>' : ''}
                         ${roleBadge(m.role)}
                     </div>
@@ -59,7 +59,7 @@ async function loadMembers() {
                         <option value="manager" ${m.role === 'manager' ? 'selected' : ''}>Manager</option>
                     </select>
                     <button onclick="removeMember(${m.id}, '${esc(m.name)}')"
-                        class="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-900/20 transition text-xs" title="Remove from team">
+                        class="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-900/20 transition text-xs" title="Remove from team">
                         <i class="fa-solid fa-user-minus"></i>
                     </button>` : ''}
                 </div>
@@ -67,7 +67,7 @@ async function loadMembers() {
         `).join('');
     } catch(e) {
         document.getElementById('memberList').innerHTML =
-            '<div class="px-6 py-6 text-center text-red-400 text-sm">Failed to load members.</div>';
+            '<div class="px-6 py-6 text-center text-red-600 text-sm">Failed to load members.</div>';
     }
 }
 
@@ -97,14 +97,14 @@ async function loadInvites() {
                     <div class="text-xs text-slate-500 mt-0.5">Expires ${esc(i.expiresAt)}</div>
                 </div>
                 <button onclick="revokeInvite(${i.id}, '${esc(i.email)}')"
-                    class="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-900/20 transition text-xs shrink-0" title="Revoke invite">
+                    class="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-900/20 transition text-xs shrink-0" title="Revoke invite">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
         `).join('');
     } catch(e) {
         document.getElementById('inviteList').innerHTML =
-            '<div class="px-6 py-6 text-center text-red-400 text-sm">Failed to load invites.</div>';
+            '<div class="px-6 py-6 text-center text-red-600 text-sm">Failed to load invites.</div>';
     }
 }
 
@@ -129,7 +129,7 @@ async function sendInvite() {
             document.getElementById('inviteEmail').value = '';
             if (data.acceptUrl) {
                 document.getElementById('inviteNote').innerHTML =
-                    `<span class="text-yellow-400">SMTP not configured — share this link manually:</span> <a href="${data.acceptUrl}" class="text-brand underline break-all">${data.acceptUrl}</a>`;
+                    `<span class="text-yellow-600">SMTP not configured — share this link manually:</span> <a href="${data.acceptUrl}" class="text-brand underline break-all">${data.acceptUrl}</a>`;
             }
             loadInvites();
         } else {

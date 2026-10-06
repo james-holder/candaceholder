@@ -26,6 +26,7 @@
     <script src="~/js/home-index-autocomplete.js" asp-append-version="true"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key=@ViewBag.GoogleMapsApiKey&libraries=places&loading=async&callback=initAutocomplete" async></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true" />
 </head>
 <body class="min-h-screen">
 
@@ -37,25 +38,25 @@
 
         <!-- Logo -->
         <a href="/" class="flex items-center gap-2.5">
-            <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center shadow">
-                <i class="fa-solid fa-address-book text-white text-sm"></i>
+            <div class="w-8 h-8 brand-logo rounded-lg flex items-center justify-center shadow">
+                <i class="fa-solid fa-address-book text-slate-50 text-sm"></i>
             </div>
             <span class="text-lg font-bold tracking-tight">
-                Candace <span class="text-brand">Holder</span>
+                Candace <span class="brand-text">Holder</span>
             </span>
         </a>
 
         <!-- Nav links (desktop) -->
         <nav class="hidden lg:flex items-center gap-6 text-sm text-slate-400">
-            <a href="/" class="text-white">Search</a>
-            <a href="/Leads/Saved" class="hover:text-white transition-colors">Saved Leads</a>
-            <a href="/Dashboard" class="hover:text-white transition-colors">Dashboard</a>
-            <a href="/Help" class="hover:text-white transition-colors">
+            <a href="/" class="text-slate-50">Search</a>
+            <a href="/Leads/Saved" class="hover:text-brand transition-colors">Saved Leads</a>
+            <a href="/Dashboard" class="hover:text-brand transition-colors">Dashboard</a>
+            <a href="/Help" class="hover:text-brand transition-colors">
                 <i class="fa-solid fa-circle-question mr-1 text-xs"></i>Help
             </a>
             @if (User.FindFirst("admin_role")?.Value is "admin" or "super_admin" ||
                  string.Equals(User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "", Configuration["AdminEmail"], System.StringComparison.OrdinalIgnoreCase)) {
-                <a href="/Admin" class="text-orange-400 hover:text-orange-300 transition-colors text-xs">
+                <a href="/Admin" class="text-orange-600 hover:text-orange-700 transition-colors text-xs">
                     <i class="fa-solid fa-shield-halved mr-1"></i>Admin
                 </a>
             }
@@ -65,23 +66,23 @@
 
         <!-- Hamburger (mobile only) -->
         <button id="mobileMenuBtn" onclick="toggleMobileMenu()"
-            class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors">
+            class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-brand hover:bg-slate-700/60 transition-colors">
             <i id="mobileMenuIcon" class="fa-solid fa-bars text-lg"></i>
         </button>
     </div>
 
     <!-- Mobile nav drawer -->
     <div id="mobileMenu" class="hidden lg:hidden absolute top-full left-0 right-0 bg-navy border-t border-slate-700/60 shadow-2xl z-50 px-4 py-3 flex flex-col gap-1">
-        <a href="/" class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-700/60 text-white font-semibold text-sm">
+        <a href="/" class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-700/60 text-slate-50 font-semibold text-sm">
             <i class="fa-solid fa-magnifying-glass text-brand w-4 text-center text-xs"></i>Search
         </a>
-        <a href="/Leads/Saved" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+        <a href="/Leads/Saved" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-brand hover:bg-slate-700/60 transition-colors text-sm">
             <i class="fa-solid fa-bookmark w-4 text-center text-xs"></i>Saved Leads
         </a>
-        <a href="/Dashboard" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+        <a href="/Dashboard" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-brand hover:bg-slate-700/60 transition-colors text-sm">
             <i class="fa-solid fa-chart-bar w-4 text-center text-xs"></i>Dashboard
         </a>
-        <a href="/Help" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm">
+        <a href="/Help" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-brand hover:bg-slate-700/60 transition-colors text-sm">
             <i class="fa-solid fa-circle-question w-4 text-center text-xs"></i>Help
         </a>
         <div class="border-t border-slate-700/60 my-1"></div>
@@ -102,7 +103,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex">
         <button id="tabBtnSearch" onclick="switchMainTab('search')"
             class="flex items-center gap-2 px-5 py-3.5 text-sm font-semibold
-                   border-b-2 border-brand text-white -mb-px transition-colors">
+                   border-b-2 border-brand text-slate-50 -mb-px transition-colors">
             <i class="fa-solid fa-magnifying-glass-location text-brand/80 text-xs"></i>
             Address Search
         </button>
@@ -149,7 +150,7 @@
                         id="addressInput"
                         type="text"
                         placeholder="123 Main St, Dallas, TX"
-                        class="w-full pl-9 pr-4 py-3.5 rounded-xl bg-slate-900 border border-slate-600 text-white placeholder-slate-500
+                        class="w-full pl-9 pr-4 py-3.5 rounded-xl bg-slate-900 border border-slate-600 text-slate-50 placeholder-slate-500
                                focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition"
                     />
                 </div>
@@ -161,7 +162,7 @@
                     </div>
                     <select
                         id="radiusSelect"
-                        class="pl-8 pr-8 py-3.5 rounded-xl bg-slate-900 border border-slate-600 text-white appearance-none
+                        class="pl-8 pr-8 py-3.5 rounded-xl bg-slate-900 border border-slate-600 text-slate-50 appearance-none
                                focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition cursor-pointer"
                     >
                         <option value="0.1">0.1 mi</option>
@@ -191,11 +192,11 @@
 
             <p class="mt-3 text-xs text-slate-500">
                 Finds every address in the area. Save the ones you want, then skip trace them from
-                <a href="/Leads/Saved" class="text-brand hover:text-orange-400">Saved Leads</a>.
+                <a href="/Leads/Saved" class="text-brand hover:text-orange-600">Saved Leads</a>.
             </p>
 
             <!-- Error message -->
-            <div id="errorMsg" class="hidden mt-4 flex items-center gap-2 text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">
+            <div id="errorMsg" class="hidden mt-4 flex items-center gap-2 text-red-600 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">
                 <i class="fa-solid fa-triangle-exclamation"></i>
                 <span id="errorText">Something went wrong. Please try again.</span>
             </div>
@@ -210,10 +211,10 @@
         <div id="continueWidget" class="max-w-3xl mx-auto px-4 sm:px-6 pb-10 -mt-2">
             <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl overflow-hidden">
                 <div class="px-5 py-4 border-b border-slate-700/60 flex items-center justify-between">
-                    <h2 class="text-sm font-bold text-white">
+                    <h2 class="text-sm font-bold text-slate-50">
                         <i class="fa-solid fa-clock-rotate-left text-brand mr-2"></i>Continue
                     </h2>
-                    <a href="/Leads/Saved" class="text-xs text-brand hover:text-orange-400 font-semibold">
+                    <a href="/Leads/Saved" class="text-xs text-brand hover:text-orange-600 font-semibold">
                         View all <i class="fa-solid fa-arrow-right ml-1"></i>
                     </a>
                 </div>
@@ -227,7 +228,7 @@
                             </div>
                             @if (lead.IsEnriched)
                             {
-                                <span class="text-xs font-semibold text-green-400 shrink-0"><i class="fa-solid fa-circle-check mr-1"></i>Traced</span>
+                                <span class="text-xs font-semibold text-green-600 shrink-0"><i class="fa-solid fa-circle-check mr-1"></i>Traced</span>
                             }
                             else
                             {
@@ -253,18 +254,18 @@
                 <i class="fa-solid fa-magnifying-glass text-slate-500 text-xs"></i>
             </div>
             <input id="mapJumpInput" type="text" placeholder="Go to a city, ZIP, or address…"
-                class="w-full pl-8 pr-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-white text-sm placeholder-slate-500
+                class="w-full pl-8 pr-3 py-2 rounded-lg bg-slate-900 border border-slate-600 text-slate-50 text-sm placeholder-slate-500
                        focus:outline-none focus:ring-1 focus:ring-brand" />
         </div>
         <button onclick="jumpMapTo()"
-            class="px-3 py-2 rounded-lg border border-slate-600 bg-slate-900 text-xs text-slate-300 hover:text-white transition-colors">
+            class="px-3 py-2 rounded-lg border border-slate-600 bg-slate-900 text-xs text-slate-300 hover:text-brand transition-colors">
             Go
         </button>
 
         <!-- Draw-a-rectangle area selection -->
         <button id="areaSelectBtn" onclick="toggleAreaSelect()"
             class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-600 bg-slate-900
-                   text-xs font-semibold text-slate-300 hover:text-white hover:border-brand/60 transition-colors">
+                   text-xs font-semibold text-slate-300 hover:text-brand hover:border-brand/60 transition-colors">
             <i class="fa-solid fa-draw-polygon text-brand text-xs"></i>
             Select Area
         </button>
@@ -288,7 +289,7 @@
     <!-- ── Summary bar ── -->
     <div class="mb-6 flex flex-wrap items-center gap-3">
         <div class="flex-1 min-w-0">
-            <h2 class="text-xl font-bold text-white truncate">
+            <h2 class="text-xl font-bold text-slate-50 truncate">
                 <i class="fa-solid fa-map-pin text-brand mr-2"></i>
                 <span id="centerLabel">Results</span>
             </h2>
@@ -296,7 +297,7 @@
         <div class="flex flex-wrap gap-2">
             <div class="summary-badge flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-700 border border-slate-600 text-sm">
                 <span class="text-slate-300 font-medium">Addresses:</span>
-                <span id="countTotal" class="text-white font-bold">0</span>
+                <span id="countTotal" class="text-slate-50 font-bold">0</span>
             </div>
         </div>
     </div>
@@ -364,8 +365,8 @@
 <footer class="mt-12 border-t border-slate-700/60 bg-slate-900/60">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
         <div class="flex items-center gap-2">
-            <div class="w-5 h-5 bg-brand/80 rounded flex items-center justify-center">
-                <i class="fa-solid fa-address-book text-white text-xs"></i>
+            <div class="w-5 h-5 brand-logo rounded flex items-center justify-center">
+                <i class="fa-solid fa-address-book text-slate-50 text-xs"></i>
             </div>
             <span>Candace Holder &copy; 2026</span>
         </div>

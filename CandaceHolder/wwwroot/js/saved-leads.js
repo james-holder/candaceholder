@@ -46,7 +46,7 @@ async function loadLeads() {
     } catch (e) {
         setLoading(false);
         document.getElementById('leadsBody').innerHTML =
-            '<tr><td colspan="7" class="text-center text-red-400 py-8 text-sm px-4">' +
+            '<tr><td colspan="7" class="text-center text-red-600 py-8 text-sm px-4">' +
             '<i class="fa-solid fa-triangle-exclamation mr-2"></i>Failed to load: ' + escapeHtml(e.message) + '</td></tr>';
     }
 }
@@ -381,29 +381,29 @@ function buildRow(lead) {
     const ed = editingId === lead.id;
 
     const cbCell = activeTab !== 'archived'
-        ? '<td class="w-8"><input type="checkbox" class="row-checkbox accent-orange-500 w-4 h-4 cursor-pointer" data-id="' + lead.id + '" onchange="toggleRowSelect(this)" /></td>'
+        ? '<td class="w-8"><input type="checkbox" class="row-checkbox accent-pink-600 w-4 h-4 cursor-pointer" data-id="' + lead.id + '" onchange="toggleRowSelect(this)" /></td>'
         : '';
 
     const hasNotes = !!(lead.notes && lead.notes.trim());
     const notesBtn = '<button onclick="openNotes(' + lead.id + ')" class="' + iconBtn + ' ' +
-        (hasNotes ? 'bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 border-amber-500/30' : 'bg-slate-700 hover:bg-slate-600 text-slate-400 border-slate-600') +
+        (hasNotes ? 'bg-amber-500/15 hover:bg-amber-500/30 text-amber-600 border-amber-500/30' : 'bg-slate-700 hover:bg-slate-600 text-slate-400 border-slate-600') +
         '" title="' + (hasNotes ? escapeAttr(lead.notes.slice(0,80)) : 'Add notes') + '"><i class="fa-solid fa-note-sticky text-xs"></i></button>';
 
     const penBtn = '<button onclick="' + (ed ? 'cancelEdit()' : 'startEdit(' + lead.id + ')') + '" class="' + iconBtn + ' ' +
         (ed ? 'bg-brand/20 text-brand border-brand/40' : 'bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-brand border-slate-600') +
         '" title="' + (ed ? 'Cancel edit' : 'Edit owner info') + '"><i class="fa-solid fa-pen text-xs"></i></button>';
 
-    const openBtn = '<a href="/Leads/' + lead.id + '" class="' + iconBtn + ' bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white border-slate-600" title="Open lead"><i class="fa-solid fa-up-right-from-square text-xs"></i></a>';
+    const openBtn = '<a href="/Leads/' + lead.id + '" class="' + iconBtn + ' bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-brand border-slate-600" title="Open lead"><i class="fa-solid fa-up-right-from-square text-xs"></i></a>';
 
     const traceBtn = !lead.isEnriched && canEnrich
-        ? '<button onclick="enrichLead(' + lead.id + ', this)" class="' + iconBtn + ' bg-orange-500/10 hover:bg-orange-500/30 text-orange-400 border-orange-500/20" title="Skip trace"><i class="fa-solid fa-magnifying-glass-dollar text-xs"></i></button>'
+        ? '<button onclick="enrichLead(' + lead.id + ', this)" class="' + iconBtn + ' bg-orange-500/10 hover:bg-orange-500/30 text-orange-600 border-orange-500/20" title="Skip trace"><i class="fa-solid fa-magnifying-glass-dollar text-xs"></i></button>'
         : lead.isEnriched
             ? '<span class="w-7 h-7 flex items-center justify-center" title="Skip traced"><i class="fa-solid fa-circle-check text-xs text-green-500"></i></span>'
             : '';
 
     let ac;
     if (activeTab === 'archived') {
-        ac = '<button onclick="restoreLead(' + lead.id + ', this)" class="' + iconBtn + ' bg-green-500/10 hover:bg-green-500/30 text-green-400 border-green-500/20" title="Restore"><i class="fa-solid fa-rotate-left text-xs"></i></button>' +
+        ac = '<button onclick="restoreLead(' + lead.id + ', this)" class="' + iconBtn + ' bg-green-500/10 hover:bg-green-500/30 text-green-600 border-green-500/20" title="Restore"><i class="fa-solid fa-rotate-left text-xs"></i></button>' +
              notesBtn + openBtn;
     } else {
         ac = traceBtn + penBtn + notesBtn + openBtn;
@@ -422,7 +422,7 @@ function buildRow(lead) {
           '<input class="owner-input flex-1" id="eName_' + lead.id + '" value="' + escapeAttr(lead.ownerName || '') + '" placeholder="Owner name..." />' +
           '<input class="owner-input flex-1" id="ePhone_' + lead.id + '" value="' + escapeAttr(lead.ownerPhone || '') + '" placeholder="(555) 000-0000" />' +
           '<input class="owner-input flex-1" id="eEmail_' + lead.id + '" value="' + escapeAttr(lead.ownerEmail || '') + '" placeholder="owner@example.com" />' +
-          '<button onclick="saveOwner(' + lead.id + ')" class="flex-shrink-0 ' + iconBtn + ' bg-green-500/20 hover:bg-green-500/40 text-green-400 border-green-500/30" title="Save"><i class="fa-solid fa-check text-xs"></i></button>' +
+          '<button onclick="saveOwner(' + lead.id + ')" class="flex-shrink-0 ' + iconBtn + ' bg-green-500/20 hover:bg-green-500/40 text-green-600 border-green-500/30" title="Save"><i class="fa-solid fa-check text-xs"></i></button>' +
           '<button onclick="cancelEdit()" class="flex-shrink-0 ' + iconBtn + ' bg-slate-600/40 hover:bg-slate-600 text-slate-400 border-slate-600" title="Cancel"><i class="fa-solid fa-xmark text-xs"></i></button>' +
           '</div></td></tr>'
         : '';
@@ -435,7 +435,7 @@ function buildRow(lead) {
           'onkeydown="if(event.key===\'Escape\'){closeNotes();}else if((event.metaKey||event.ctrlKey)&&event.key===\'Enter\'){saveNotes(' + lead.id + ');}">' +
           escapeHtml(lead.notes || '') +
           '</textarea>' +
-          '<button onclick="saveNotes(' + lead.id + ')" class="flex-shrink-0 mt-0.5 ' + iconBtn + ' bg-green-500/20 hover:bg-green-500/40 text-green-400 border-green-500/30" title="Save (Ctrl+Enter)"><i class="fa-solid fa-check text-xs"></i></button>' +
+          '<button onclick="saveNotes(' + lead.id + ')" class="flex-shrink-0 mt-0.5 ' + iconBtn + ' bg-green-500/20 hover:bg-green-500/40 text-green-600 border-green-500/30" title="Save (Ctrl+Enter)"><i class="fa-solid fa-check text-xs"></i></button>' +
           '<button onclick="closeNotes()" class="flex-shrink-0 mt-0.5 ' + iconBtn + ' bg-slate-600/40 hover:bg-slate-600 text-slate-400 border-slate-600" title="Cancel (Esc)"><i class="fa-solid fa-xmark text-xs"></i></button>' +
           '</div></td></tr>'
         : '';
@@ -444,16 +444,16 @@ function buildRow(lead) {
         ? '<span class="block text-xs text-slate-500">+' + (lead.contacts.length - 1) + ' more contact' + (lead.contacts.length > 2 ? 's' : '') + '</span>'
         : '';
     const phoneCell = lead.ownerPhone
-        ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="text-green-400 hover:text-green-300 whitespace-nowrap">' + escapeHtml(lead.ownerPhone) + '</a>' + extraContacts
+        ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="text-green-600 hover:text-green-700 whitespace-nowrap">' + escapeHtml(lead.ownerPhone) + '</a>' + extraContacts
         : '<span class="text-slate-600">—</span>';
     const emailCell = lead.ownerEmail
-        ? '<a href="mailto:' + escapeAttr(lead.ownerEmail) + '" class="text-indigo-300 hover:text-indigo-200 truncate block" style="max-width:200px">' + escapeHtml(lead.ownerEmail) + '</a>'
+        ? '<a href="mailto:' + escapeAttr(lead.ownerEmail) + '" class="text-indigo-700 hover:text-indigo-700 truncate block" style="max-width:200px">' + escapeHtml(lead.ownerEmail) + '</a>'
         : '<span class="text-slate-600">—</span>';
 
     const rowSelectedCls = selectedIds.has(lead.id) ? ' row-selected bg-orange-500/5 border-l-2 border-orange-500' : '';
     return '<tr data-lead-id="' + lead.id + '" class="' + (ed ? 'editing' : '') + rowSelectedCls + '">' +
         cbCell +
-        '<td class="font-medium text-white" style="max-width:240px"><span class="block truncate" title="' + escapeAttr(lead.address) + '">' + escapeHtml(lead.address) + '</span>' +
+        '<td class="font-medium text-slate-50" style="max-width:240px"><span class="block truncate" title="' + escapeAttr(lead.address) + '">' + escapeHtml(lead.address) + '</span>' +
         (lead.sourceAddress ? '<span class="block text-xs text-slate-500 truncate">from ' + escapeHtml(lead.sourceAddress) + '</span>' : '') + '</td>' +
         '<td>' + (lead.ownerName ? escapeHtml(lead.ownerName) : '<span class="text-slate-600">—</span>') + '</td>' +
         '<td>' + phoneCell + '</td>' +
@@ -571,30 +571,30 @@ function buildMobileCard(lead) {
 
     if (ed) {
         return '<div class="bg-slate-800 border border-brand/40 rounded-2xl p-4 shadow-md" data-lead-id="' + lead.id + '">' +
-            '<p class="text-white font-semibold text-sm mb-3 truncate">' + escapeHtml(lead.address) + '</p>' +
+            '<p class="text-slate-50 font-semibold text-sm mb-3 truncate">' + escapeHtml(lead.address) + '</p>' +
             '<div class="space-y-2 mb-3">' +
             '<input class="owner-input w-full" id="eName_'  + lead.id + '" value="' + escapeAttr(lead.ownerName  || '') + '" placeholder="Owner name" />' +
             '<input class="owner-input w-full" id="ePhone_' + lead.id + '" value="' + escapeAttr(lead.ownerPhone || '') + '" placeholder="(555) 000-0000" />' +
             '<input class="owner-input w-full" id="eEmail_' + lead.id + '" value="' + escapeAttr(lead.ownerEmail || '') + '" placeholder="owner@example.com" />' +
             '</div>' +
             '<div class="flex gap-2">' +
-            '<button onclick="saveOwner(' + lead.id + ')" class="flex-1 py-2.5 rounded-xl bg-green-500/20 border border-green-500/30 text-green-400 text-sm font-semibold hover:bg-green-500/30 transition"><i class="fa-solid fa-check mr-1"></i>Save</button>' +
+            '<button onclick="saveOwner(' + lead.id + ')" class="flex-1 py-2.5 rounded-xl bg-green-500/20 border border-green-500/30 text-green-600 text-sm font-semibold hover:bg-green-500/30 transition"><i class="fa-solid fa-check mr-1"></i>Save</button>' +
             '<button onclick="cancelEdit()" class="py-2.5 px-4 rounded-xl bg-slate-700 border border-slate-600 text-slate-300 text-sm font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-xmark"></i></button>' +
             '</div></div>';
     }
 
     const phoneHtml = lead.ownerPhone
-        ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/15 border border-green-500/30 text-green-400 text-sm font-semibold active:bg-green-500/30 transition"><i class="fa-solid fa-phone"></i>' + escapeHtml(lead.ownerPhone) + '</a>'
+        ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/15 border border-green-500/30 text-green-600 text-sm font-semibold active:bg-green-500/30 transition"><i class="fa-solid fa-phone"></i>' + escapeHtml(lead.ownerPhone) + '</a>'
         : '<span class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-700/40 border border-slate-600/60 text-slate-500 text-sm"><i class="fa-solid fa-phone-slash"></i>No phone yet</span>';
 
     const tracedBadge = lead.isEnriched
-        ? '<span class="text-xs text-green-400 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>Traced</span>'
+        ? '<span class="text-xs text-green-600 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>Traced</span>'
         : '<span class="text-xs text-slate-500">Not traced</span>';
 
     const actionBtns = activeTab === 'archived'
-        ? '<button onclick="restoreLead(' + lead.id + ', this)" class="flex-1 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-semibold hover:bg-green-500/20 transition"><i class="fa-solid fa-rotate-left mr-1"></i>Restore</button>'
+        ? '<button onclick="restoreLead(' + lead.id + ', this)" class="flex-1 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 text-xs font-semibold hover:bg-green-500/20 transition"><i class="fa-solid fa-rotate-left mr-1"></i>Restore</button>'
         : (!lead.isEnriched && canEnrich
-              ? '<button onclick="enrichLead(' + lead.id + ', this)" class="flex-1 py-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-semibold hover:bg-orange-500/20 active:bg-orange-500/30 transition"><i class="fa-solid fa-magnifying-glass-dollar mr-1"></i>Skip Trace</button>'
+              ? '<button onclick="enrichLead(' + lead.id + ', this)" class="flex-1 py-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-600 text-xs font-semibold hover:bg-orange-500/20 active:bg-orange-500/30 transition"><i class="fa-solid fa-magnifying-glass-dollar mr-1"></i>Skip Trace</button>'
               : '') +
           '<button onclick="startEdit(' + lead.id + ')" class="flex-1 py-2 rounded-xl bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-pen mr-1"></i>Edit</button>' +
           '<a href="/Leads/' + lead.id + '" class="py-2 px-3.5 rounded-xl bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-up-right-from-square"></i></a>';
@@ -611,24 +611,24 @@ function buildMobileCard(lead) {
         ? '<div class="mt-3 pt-3 border-t border-slate-700/60 space-y-2">' +
           '<textarea id="notesArea_' + lead.id + '" class="notes-textarea w-full" rows="3" placeholder="Add notes about this lead">' + escapeHtml(lead.notes || '') + '</textarea>' +
           '<div class="flex gap-2">' +
-          '<button onclick="saveNotes(' + lead.id + ')" class="flex-1 py-2 rounded-xl bg-green-500/20 border border-green-500/30 text-green-400 text-xs font-semibold hover:bg-green-500/30 transition"><i class="fa-solid fa-check mr-1"></i>Save Note</button>' +
+          '<button onclick="saveNotes(' + lead.id + ')" class="flex-1 py-2 rounded-xl bg-green-500/20 border border-green-500/30 text-green-600 text-xs font-semibold hover:bg-green-500/30 transition"><i class="fa-solid fa-check mr-1"></i>Save Note</button>' +
           '<button onclick="closeNotes()" class="py-2 px-3.5 rounded-xl bg-slate-700 border border-slate-600 text-slate-300 text-xs font-semibold hover:bg-slate-600 transition"><i class="fa-solid fa-xmark"></i></button>' +
           '</div></div>'
         : '<div class="mt-3 pt-3 border-t border-slate-700/60">' +
-          (hasNotes ? '<p class="text-xs text-slate-400 mb-2 leading-relaxed"><i class="fa-solid fa-note-sticky mr-1.5 text-amber-400"></i>' + escapeHtml(lead.notes.slice(0,100)) + (lead.notes.length > 100 ? '...' : '') + '</p>' : '') +
-          '<button onclick="openNotes(' + lead.id + ')" class="w-full py-2 rounded-xl bg-slate-700/60 border border-slate-600/60 text-xs font-semibold hover:bg-slate-700 transition ' + (hasNotes ? 'text-amber-400' : 'text-slate-400') + '">' +
+          (hasNotes ? '<p class="text-xs text-slate-400 mb-2 leading-relaxed"><i class="fa-solid fa-note-sticky mr-1.5 text-amber-600"></i>' + escapeHtml(lead.notes.slice(0,100)) + (lead.notes.length > 100 ? '...' : '') + '</p>' : '') +
+          '<button onclick="openNotes(' + lead.id + ')" class="w-full py-2 rounded-xl bg-slate-700/60 border border-slate-600/60 text-xs font-semibold hover:bg-slate-700 transition ' + (hasNotes ? 'text-amber-600' : 'text-slate-400') + '">' +
           '<i class="fa-solid fa-note-sticky mr-1.5"></i>' + (hasNotes ? 'Edit Note' : 'Add Note') + '</button>' +
           '</div>';
 
     const cb = activeTab !== 'archived'
-        ? '<input type="checkbox" class="row-checkbox accent-orange-500 w-4 h-4 mt-0.5 cursor-pointer" data-id="' + lead.id + '" onchange="toggleRowSelect(this)" />'
+        ? '<input type="checkbox" class="row-checkbox accent-pink-600 w-4 h-4 mt-0.5 cursor-pointer" data-id="' + lead.id + '" onchange="toggleRowSelect(this)" />'
         : '';
 
     return '<div class="bg-slate-800 border border-slate-700/60 rounded-2xl p-4 shadow-md" data-lead-id="' + lead.id + '">' +
         '<div class="flex items-start justify-between gap-2 mb-3">' +
         cb +
         '<div class="flex-1 min-w-0">' +
-        '<p class="font-semibold text-white text-sm leading-tight">' + escapeHtml(lead.address) + '</p>' +
+        '<p class="font-semibold text-slate-50 text-sm leading-tight">' + escapeHtml(lead.address) + '</p>' +
         (lead.ownerName ? '<p class="text-xs text-slate-400 mt-0.5"><i class="fa-solid fa-user mr-1"></i>' + escapeHtml(lead.ownerName) + '</p>' : '') +
         '</div>' +
         tracedBadge +

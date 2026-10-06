@@ -237,7 +237,7 @@
                     <input type="checkbox" class="lead-check" data-idx="${idx}"
                            onchange="onCardCheckChange(this)" title="Select for saving" />
                 </div>
-                <p class="flex-1 min-w-0 font-semibold text-white text-sm leading-tight truncate">${escapeHtml(p.address)}</p>
+                <p class="flex-1 min-w-0 font-semibold text-slate-50 text-sm leading-tight truncate">${escapeHtml(p.address)}</p>
                 <span class="text-xs text-slate-500 shrink-0">${dist}</span>
             </div>
         </div>`;
@@ -402,7 +402,7 @@ function switchMainTab(tab) {
     [['tabBtnSearch', isSearch], ['tabBtnMap', !isSearch]].forEach(([id, active]) => {
         const btn = document.getElementById(id);
         btn.classList.toggle('border-brand',       active);
-        btn.classList.toggle('text-white',         active);
+        btn.classList.toggle('text-slate-50',         active);
         btn.classList.toggle('border-transparent', !active);
         btn.classList.toggle('text-slate-400',     !active);
     });

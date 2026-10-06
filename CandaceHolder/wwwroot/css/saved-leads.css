@@ -1,21 +1,21 @@
 *, *::before, *::after { box-sizing: border-box; }
         html { scroll-behavior: smooth; }
-        body { background: #0f172a; color: #e2e8f0; font-family: ui-sans-serif, system-ui, sans-serif; }
+        body { background: #fbf8fd; color: #1f1235; font-family: ui-sans-serif, system-ui, sans-serif; }
 
         /* ── Table ── */
         #leadsTable th {
-            background: #1e293b; color: #94a3b8; font-size: 11px;
+            background: #ffffff; color: #625a73; font-size: 11px;
             font-weight: 600; padding: 10px 12px; text-transform: uppercase;
             letter-spacing: 0.04em; white-space: nowrap; cursor: pointer;
             user-select: none; transition: color 0.15s, background 0.15s;
         }
-        #leadsTable th:hover { color: #f97316; background: #263548; }
-        #leadsTable th.sort-asc  .sort-icon::after { content: ' ▲'; color: #f97316; }
-        #leadsTable th.sort-desc .sort-icon::after { content: ' ▼'; color: #f97316; }
-        #leadsTable th .sort-icon::after { content: ' ⇅'; color: #475569; font-size: 9px; }
-        #leadsTable tbody tr { border-bottom: 1px solid rgba(51,65,85,0.6); transition: background 0.15s; }
-        #leadsTable tbody tr:hover { background: rgba(249,115,22,0.04); }
-        #leadsTable tbody td { padding: 10px 12px; font-size: 12px; color: #cbd5e1; vertical-align: middle; }
+        #leadsTable th:hover { color: #e11d74; background: #fdf2f8; }
+        #leadsTable th.sort-asc  .sort-icon::after { content: ' ▲'; color: #e11d74; }
+        #leadsTable th.sort-desc .sort-icon::after { content: ' ▼'; color: #e11d74; }
+        #leadsTable th .sort-icon::after { content: ' ⇅'; color: #d9d1e3; font-size: 9px; }
+        #leadsTable tbody tr { border-bottom: 1px solid rgba(217,209,227,0.8); transition: background 0.15s; }
+        #leadsTable tbody tr:hover { background: rgba(225,29,116,0.04); }
+        #leadsTable tbody td { padding: 10px 12px; font-size: 12px; color: #4a3f5e; vertical-align: middle; }
 
         /* ── Sticky Actions column — always visible, never clipped ── */
         #leadsTable th.sticky-actions,
@@ -23,27 +23,27 @@
             position: sticky;
             right: 0;
             z-index: 2;
-            background: #1e293b;
+            background: #ffffff;
             min-width: 90px;
             padding: 10px 16px 10px 12px;
             box-shadow: -4px 0 8px rgba(0,0,0,0.25);
         }
-        #leadsTable tbody td.sticky-actions { background: #0f172a; }
-        #leadsTable tbody tr:hover td.sticky-actions { background: rgba(15,23,42,0.97); }
+        #leadsTable tbody td.sticky-actions { background: #fbf8fd; }
+        #leadsTable tbody tr:hover td.sticky-actions { background: rgba(255,255,255,0.97); }
 
         /* ── Row in edit mode ── */
-        tr.editing td { background: rgba(249,115,22,0.05) !important; }
+        tr.editing td { background: rgba(225,29,116,0.05) !important; }
         .owner-input {
-            background: #0f172a; border: 1px solid #475569; border-radius: 6px;
-            color: #e2e8f0; font-size: 12px; padding: 4px 8px; width: 100%;
+            background: #fbf8fd; border: 1px solid #d9d1e3; border-radius: 6px;
+            color: #1f1235; font-size: 12px; padding: 4px 8px; width: 100%;
             min-width: 110px; outline: none; transition: border-color 0.15s;
         }
-        .owner-input:focus { border-color: #f97316; }
+        .owner-input:focus { border-color: #e11d74; }
 
         /* ── Pill tabs (Active / Closed / Archived) ── */
-        .lead-tab { color: #64748b; }
-        .lead-tab:hover:not(.lead-tab-active) { color: #cbd5e1; background: #334155; }
-        .lead-tab-active { background: #f97316; color: #fff !important; box-shadow: 0 2px 8px rgba(249,115,22,0.35); }
+        .lead-tab { color: #7c7590; }
+        .lead-tab:hover:not(.lead-tab-active) { color: #4a3f5e; background: #ece6f3; }
+        .lead-tab-active { background: #e11d74; color: #fff !important; box-shadow: 0 2px 8px rgba(225,29,116,0.35); }
 
         /* ── Spinner ── */
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -54,7 +54,7 @@
             position: fixed; bottom: 28px; right: 28px; z-index: 9999;
             padding: 12px 20px; border-radius: 12px; font-size: 13px; font-weight: 600;
             display: flex; align-items: center; gap: 10px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            box-shadow: 0 8px 32px rgba(31,18,53,0.12);
             transform: translateY(80px); opacity: 0;
             transition: transform 0.3s ease, opacity 0.3s ease;
             pointer-events: none;
@@ -65,21 +65,21 @@
 
         /* ── Filter btn ── */
         .filter-btn { transition: background 0.15s, color 0.15s; }
-        .filter-btn.active { background: #f97316; color: #fff; }
+        .filter-btn.active { background: #e11d74; color: #fff; }
 
         /* ── Scrollbar ── */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #f97316; }
+        ::-webkit-scrollbar-track { background: #ffffff; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #d9d1e3; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #e11d74; }
 
         /* ── Status select ── */
         .status-select {
-            background: #1e293b;
-            border: 1px solid #334155;
+            background: #ffffff;
+            border: 1px solid #ece6f3;
             border-left-width: 3px;
             border-radius: 8px;
-            color: #e2e8f0;
+            color: #1f1235;
             font-size: 11px;
             font-weight: 600;
             padding: 4px 6px;
@@ -90,15 +90,15 @@
             width: 100%;
         }
         .status-select:hover,
-        .status-select:focus { background: #263548; }
-        .status-select.status-new       { border-left-color: #64748b; color: #94a3b8; }
-        .status-select.status-contacted { border-left-color: #3b82f6; color: #93c5fd; }
-        .status-select.status-appt      { border-left-color: #a855f7; color: #d8b4fe; }
-        .status-select.status-won       { border-left-color: #22c55e; color: #86efac; }
-        .status-select.status-lost      { border-left-color: #ef4444; color: #fca5a5; }
+        .status-select:focus { background: #fdf2f8; }
+        .status-select.status-new       { border-left-color: #7c7590; color: #625a73; }
+        .status-select.status-contacted { border-left-color: #3b82f6; color: #1d4ed8; }
+        .status-select.status-appt      { border-left-color: #a855f7; color: #7e22ce; }
+        .status-select.status-won       { border-left-color: #22c55e; color: #15803d; }
+        .status-select.status-lost      { border-left-color: #ef4444; color: #b91c1c; }
 
         /* ── Notes expansion row ── */
-        tr.notes-row { background: rgba(249,115,22,0.03); }
+        tr.notes-row { background: rgba(225,29,116,0.03); }
         tr.notes-row + tr,
         tr.notes-row { border-top: none !important; }
         .notes-row-cell {
@@ -106,10 +106,10 @@
             border-top: none !important;
         }
         .notes-textarea {
-            background: #0f172a;
-            border: 1px solid #475569;
+            background: #fbf8fd;
+            border: 1px solid #d9d1e3;
             border-radius: 8px;
-            color: #e2e8f0;
+            color: #1f1235;
             font-size: 12px;
             padding: 8px 10px;
             resize: vertical;
@@ -120,4 +120,4 @@
             font-family: inherit;
             line-height: 1.5;
         }
-        .notes-textarea:focus { border-color: #f97316; }
+        .notes-textarea:focus { border-color: #e11d74; }

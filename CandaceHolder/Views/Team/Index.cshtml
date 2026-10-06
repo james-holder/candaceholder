@@ -16,6 +16,7 @@
     <script src="~/js/tailwind-config-app.js" asp-append-version="true"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="/css/site.css" />
+    <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true" />
 </head>
 <body class="bg-navy text-slate-100 min-h-screen">
 
@@ -23,28 +24,28 @@
 <header class="sticky top-0 z-50 bg-navy border-b border-slate-700/60 shadow-lg relative">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
         <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center shadow">
-                <i class="fa-solid fa-address-book text-white text-sm"></i>
+            <div class="w-8 h-8 brand-logo rounded-lg flex items-center justify-center shadow">
+                <i class="fa-solid fa-address-book text-slate-50 text-sm"></i>
             </div>
             <span class="text-lg font-bold tracking-tight">
-                Candace <span class="text-brand">Holder</span>
+                Candace <span class="brand-text">Holder</span>
             </span>
         </div>
         <nav class="hidden lg:flex items-center gap-6 text-sm text-slate-400">
-            <a href="/" class="hover:text-white transition-colors">Search</a>
-            <a href="/Leads/Saved" class="hover:text-white transition-colors">Saved Leads</a>
-            <a href="/Dashboard" class="hover:text-white transition-colors">Dashboard</a>
+            <a href="/" class="hover:text-brand transition-colors">Search</a>
+            <a href="/Leads/Saved" class="hover:text-brand transition-colors">Saved Leads</a>
+            <a href="/Dashboard" class="hover:text-brand transition-colors">Dashboard</a>
             <span class="text-slate-600">|</span>
             @await Html.PartialAsync("_AccountMenu")
         </nav>
-        <button id="mobileMenuBtn" onclick="toggleMobileMenu()" class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors">
+        <button id="mobileMenuBtn" onclick="toggleMobileMenu()" class="lg:hidden p-2 rounded-lg text-slate-400 hover:text-brand hover:bg-slate-700/60 transition-colors">
             <i id="mobileMenuIcon" class="fa-solid fa-bars text-lg"></i>
         </button>
     </div>
     <div id="mobileMenu" class="hidden lg:hidden absolute top-full left-0 right-0 bg-navy border-t border-slate-700/60 shadow-2xl z-50 px-4 py-3 flex flex-col gap-1">
-        <a href="/" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm"><i class="fa-solid fa-magnifying-glass w-4 text-center text-xs"></i>Search</a>
-        <a href="/Leads/Saved" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm"><i class="fa-solid fa-bookmark w-4 text-center text-xs"></i>Saved Leads</a>
-        <a href="/Dashboard" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/60 transition-colors text-sm"><i class="fa-solid fa-chart-bar w-4 text-center text-xs"></i>Dashboard</a>
+        <a href="/" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-brand hover:bg-slate-700/60 transition-colors text-sm"><i class="fa-solid fa-magnifying-glass w-4 text-center text-xs"></i>Search</a>
+        <a href="/Leads/Saved" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-brand hover:bg-slate-700/60 transition-colors text-sm"><i class="fa-solid fa-bookmark w-4 text-center text-xs"></i>Saved Leads</a>
+        <a href="/Dashboard" class="flex items-center gap-3 px-3 py-3 rounded-xl text-slate-300 hover:text-brand hover:bg-slate-700/60 transition-colors text-sm"><i class="fa-solid fa-chart-bar w-4 text-center text-xs"></i>Dashboard</a>
         <div class="border-t border-slate-700/60 my-1"></div>
         @await Html.PartialAsync("_AccountMenuMobile")
     </div>
@@ -56,7 +57,7 @@
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-white mb-1">
+            <h1 class="text-2xl font-bold text-slate-50 mb-1">
                 <i class="fa-solid fa-users text-brand mr-2"></i>Team
             </h1>
             <p class="text-slate-400 text-sm">
@@ -72,12 +73,12 @@
     <!-- ── Invite Form (owners + managers only) ──────────────────── -->
     @if (canManage) {
     <section class="bg-navy-700 border border-slate-700/60 rounded-2xl p-6">
-        <h2 class="text-base font-semibold text-white mb-4">
+        <h2 class="text-base font-semibold text-slate-50 mb-4">
             <i class="fa-solid fa-user-plus text-brand mr-2"></i>Invite a Team Member
         </h2>
         <div class="flex flex-col sm:flex-row gap-3">
             <input id="inviteEmail" type="email" placeholder="colleague@example.com"
-                class="flex-1 bg-navy border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand/60 focus:ring-1 focus:ring-brand/30" />
+                class="flex-1 bg-navy border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-brand/60 focus:ring-1 focus:ring-brand/30" />
             @if (isOwner) {
             <select id="inviteRole"
                 class="bg-navy border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-brand/60">
@@ -101,7 +102,7 @@
     <!-- ── Members ───────────────────────────────────────────────── -->
     <section class="bg-navy-700 border border-slate-700/60 rounded-2xl overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-700/60 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-white">
+            <h2 class="text-base font-semibold text-slate-50">
                 <i class="fa-solid fa-circle-user text-brand mr-2"></i>Members
                 <span id="memberCount" class="ml-2 text-xs text-slate-500 font-normal"></span>
             </h2>
@@ -117,7 +118,7 @@
     @if (canManage) {
     <section id="invitesSection" class="bg-navy-700 border border-slate-700/60 rounded-2xl overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-700/60">
-            <h2 class="text-base font-semibold text-white">
+            <h2 class="text-base font-semibold text-slate-50">
                 <i class="fa-solid fa-envelope-open-text text-brand mr-2"></i>Pending Invites
                 <span id="inviteCount" class="ml-2 text-xs text-slate-500 font-normal"></span>
             </h2>

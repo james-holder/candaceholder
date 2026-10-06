@@ -1,0 +1,124 @@
+/* ══════════════════════════════════════════════════════════════
+   Candace Holder — bright theme
+   Loaded LAST on every page. Colors: hot pink, teal, sunny
+   yellow/orange on a light background. Pairs with the inverted
+   slate scale in wwwroot/js/tailwind-config-app.js.
+══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+:root {
+    --pink:   #e11d74;
+    --pink-2: #f472b6;
+    --teal:   #0d9488;
+    --teal-2: #2dd4bf;
+    --sun:    #f59e0b;
+    --sun-2:  #fbbf24;
+    --orange: #f97316;
+    --ink:    #1f1235;
+    --rainbow: linear-gradient(90deg, #e11d74, #f97316, #fbbf24, #2dd4bf, #0d9488);
+}
+
+/* ── Page background: soft color washes on cream ─────────────── */
+html, body {
+    background-color: #fffaf5 !important;
+    color: var(--ink) !important;
+    font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif !important;
+}
+body {
+    background-image:
+        radial-gradient(1100px 500px at -10% -10%, rgba(244,114,182,0.18), transparent 60%),
+        radial-gradient(900px 450px at 110% 0%,   rgba(45,212,191,0.18), transparent 60%),
+        radial-gradient(900px 500px at 50% 115%,  rgba(251,191,36,0.20), transparent 60%) !important;
+    background-attachment: fixed !important;
+}
+
+/* ── Header: white glass with a rainbow stripe underneath ────── */
+header.sticky {
+    background: rgba(255,255,255,0.92) !important;
+    backdrop-filter: blur(8px);
+    border-bottom: 0 !important;
+    box-shadow: 0 2px 14px rgba(225,29,116,0.08) !important;
+}
+header.sticky::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 4px;
+    background: var(--rainbow);
+}
+#mainTabBar { background: rgba(255,255,255,0.75) !important; }
+
+/* ── Logo tile + wordmark ────────────────────────────────────── */
+.brand-logo {
+    background: linear-gradient(135deg, #e11d74 0%, #f97316 55%, #fbbf24 100%) !important;
+    box-shadow: 0 4px 12px rgba(225,29,116,0.35) !important;
+}
+.brand-logo i { color: #fff !important; }
+.brand-text {
+    background: linear-gradient(90deg, #e11d74, #f97316 60%, #f59e0b);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent !important;
+}
+
+/* ── Page title banners ──────────────────────────────────────── */
+.hero-band {
+    background: linear-gradient(110deg, #fde2f0 0%, #fff1d6 50%, #d5f5ef 100%) !important;
+    border-bottom: 0 !important;
+}
+.hero-band h1 { color: var(--ink) !important; }
+
+/* ── Primary buttons get a pink→orange gradient ──────────────── */
+.bg-brand:not(.brand-logo) {
+    background-image: linear-gradient(135deg, #e11d74, #f43f5e 60%, #f97316);
+}
+.bg-brand:not(.brand-logo):hover { filter: brightness(1.06); }
+
+/* ── Stat cards: each one its own color ──────────────────────── */
+.stat-card {
+    background: #fff !important;
+    border: 0 !important;
+    border-top: 5px solid var(--pink) !important;
+    box-shadow: 0 6px 20px rgba(31,18,53,0.06);
+}
+.stat-card:nth-child(5n+1) { border-top-color: #e11d74 !important; background: #fff5fa !important; }
+.stat-card:nth-child(5n+2) { border-top-color: #0d9488 !important; background: #f0fdfa !important; }
+.stat-card:nth-child(5n+3) { border-top-color: #f59e0b !important; background: #fffbeb !important; }
+.stat-card:nth-child(5n+4) { border-top-color: #f97316 !important; background: #fff7ed !important; }
+.stat-card:nth-child(5n+5) { border-top-color: #8b5cf6 !important; background: #f5f3ff !important; }
+.stat-card:hover { box-shadow: 0 10px 26px rgba(225,29,116,0.12); }
+
+/* ── Cards & panels: soft shadow instead of dark borders ─────── */
+.rounded-2xl.border, .rounded-xl.border { box-shadow: 0 4px 16px rgba(31,18,53,0.05); }
+
+/* ── Search result cards (home page) ─────────────────────────── */
+.prop-card:hover,
+.prop-card.highlighted { border-color: var(--pink) !important; box-shadow: 0 0 0 2px rgba(225,29,116,0.25), 0 8px 20px rgba(31,18,53,0.08) !important; }
+.prop-card.selected { border-color: var(--pink) !important; background: #fff0f7 !important; }
+.lead-check { accent-color: var(--pink); }
+
+/* ── Filter pills & tabs ─────────────────────────────────────── */
+.filter-btn.active { background: var(--pink) !important; color: #fff !important; border-color: var(--pink) !important; }
+.filter-btn.active span { color: #fff !important; }
+.lead-tab-active, .detail-tab-active {
+    background: linear-gradient(135deg, #e11d74, #f97316) !important;
+    color: #fff !important;
+    box-shadow: 0 3px 10px rgba(225,29,116,0.3) !important;
+}
+.lead-tab-active i, .detail-tab-active i { color: #fff !important; }
+
+/* ── Toast ───────────────────────────────────────────────────── */
+#toast { box-shadow: 0 8px 24px rgba(31,18,53,0.18) !important; }
+#toast.success { background: #0d9488 !important; border-color: #0f766e !important; color: #fff !important; }
+#toast.error   { background: #e11d48 !important; border-color: #be123c !important; color: #fff !important; }
+
+/* ── Focus rings ─────────────────────────────────────────────── */
+input:focus, select:focus, textarea:focus { --tw-ring-color: rgba(225,29,116,0.45) !important; }
+
+/* ── Leaflet map controls / popups on the light theme ────────── */
+.leaflet-container { font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif; }
+
+/* ── Scrollbars ──────────────────────────────────────────────── */
+::-webkit-scrollbar-track { background: #f6f1fa !important; }
+::-webkit-scrollbar-thumb { background: #e9c6dc !important; }
+::-webkit-scrollbar-thumb:hover { background: var(--pink) !important; }

@@ -11,18 +11,18 @@
     border-radius: 10px;
     font-size: 0.8125rem;
     font-weight: 600;
-    color: #94a3b8;
+    color: #625a73;
     background: transparent;
     border: none;
     cursor: pointer;
     transition: all 0.15s ease;
     white-space: nowrap;
 }
-.detail-tab:hover { color: #e2e8f0; background: rgba(255,255,255,0.05); }
+.detail-tab:hover { color: #1f1235; background: rgba(255,255,255,0.05); }
 .detail-tab-active {
-    background: #f97316;
+    background: #e11d74;
     color: #fff !important;
-    box-shadow: 0 2px 8px rgba(249,115,22,0.35);
+    box-shadow: 0 2px 8px rgba(225,29,116,0.35);
 }
 
 /* Contact action buttons */
@@ -44,13 +44,13 @@
 .contact-action-call {
     background: rgba(34,197,94,0.1);
     border-color: rgba(34,197,94,0.3);
-    color: #4ade80;
+    color: #15803d;
 }
 .contact-action-call:hover { background: rgba(34,197,94,0.2); }
 .contact-action-email {
     background: rgba(99,102,241,0.1);
     border-color: rgba(99,102,241,0.3);
-    color: #818cf8;
+    color: #4338ca;
 }
 .contact-action-email:hover { background: rgba(99,102,241,0.2); }
 
@@ -60,12 +60,12 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 0;
-    border-bottom: 1px solid rgba(51,65,85,0.5);
+    border-bottom: 1px solid rgba(217,209,227,0.8);
     font-size: 0.8125rem;
 }
 .prop-row:last-child { border-bottom: none; }
-.prop-label { color: #64748b; font-weight: 500; }
-.prop-value { color: #e2e8f0; font-weight: 600; text-align: right; }
+.prop-label { color: #7c7590; font-weight: 500; }
+.prop-value { color: #1f1235; font-weight: 600; text-align: right; }
 
 /* Timeline */
 .timeline-item {
@@ -81,7 +81,7 @@
     top: 24px;
     bottom: 0;
     width: 2px;
-    background: rgba(51,65,85,0.5);
+    background: rgba(217,209,227,0.8);
 }
 .timeline-item:last-child::before { display: none; }
 .timeline-dot {
@@ -94,32 +94,32 @@
     font-size: 0.625rem;
     z-index: 1;
 }
-.timeline-dot-create   { background: rgba(99,102,241,0.2);  color: #818cf8; border: 1.5px solid rgba(99,102,241,0.4); }
-.timeline-dot-enrich   { background: rgba(249,115,22,0.2);  color: #f97316; border: 1.5px solid rgba(249,115,22,0.4); }
-.timeline-dot-status   { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1.5px solid rgba(34,197,94,0.3); }
+.timeline-dot-create   { background: rgba(99,102,241,0.2);  color: #4338ca; border: 1.5px solid rgba(99,102,241,0.4); }
+.timeline-dot-enrich   { background: rgba(225,29,116,0.2);  color: #e11d74; border: 1.5px solid rgba(225,29,116,0.4); }
+.timeline-dot-status   { background: rgba(34,197,94,0.15);  color: #15803d; border: 1.5px solid rgba(34,197,94,0.3); }
 .timeline-dot-error    { background: rgba(239,68,68,0.15);  color: #f87171; border: 1.5px solid rgba(239,68,68,0.3); }
 
 /* Contact cards on Contacts tab */
 .contact-card {
-    background: rgba(15,23,42,0.5);
-    border: 1px solid rgba(51,65,85,0.6);
+    background: rgba(251,248,253,0.5);
+    border: 1px solid rgba(217,209,227,0.8);
     border-radius: 12px;
     padding: 14px 16px;
     margin-bottom: 10px;
 }
 .contact-card.contact-primary {
-    border-color: rgba(249,115,22,0.3);
-    background: rgba(249,115,22,0.04);
+    border-color: rgba(225,29,116,0.3);
+    background: rgba(225,29,116,0.04);
 }
 
 /* Notes textarea */
 .detail-notes-textarea {
     width: 100%;
-    background: rgba(15,23,42,0.6);
-    border: 1px solid rgba(51,65,85,0.8);
+    background: rgba(251,248,253,0.6);
+    border: 1px solid rgba(217,209,227,0.8);
     border-radius: 10px;
     padding: 12px 14px;
-    color: #e2e8f0;
+    color: #1f1235;
     font-size: 0.8125rem;
     line-height: 1.6;
     resize: vertical;
@@ -129,7 +129,7 @@
 }
 .detail-notes-textarea:focus {
     outline: none;
-    border-color: #f97316;
+    border-color: #e11d74;
 }
 
 /* Enrich result banner */
@@ -146,12 +146,12 @@
 .enrich-banner-success {
     background: rgba(34,197,94,0.1);
     border: 1px solid rgba(34,197,94,0.3);
-    color: #4ade80;
+    color: #15803d;
 }
 .enrich-banner-info {
     background: rgba(99,102,241,0.1);
     border: 1px solid rgba(99,102,241,0.25);
-    color: #818cf8;
+    color: #4338ca;
 }
 
 /* Map container */
@@ -159,6 +159,6 @@
     width: 100%;
     height: 220px;
     border-radius: 12px;
-    border: 1px solid rgba(51,65,85,0.6);
+    border: 1px solid rgba(217,209,227,0.8);
     overflow: hidden;
 }

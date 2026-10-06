@@ -20,23 +20,24 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="~/css/site.css" />
     <link rel="stylesheet" href="~/css/admin.css" />
+    <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true" />
 </head>
 <body class="min-h-screen">
 
 <!-- Header -->
-<header class="sticky top-0 z-50 bg-[#0f172a] border-b border-slate-700/60 shadow-lg">
+<header class="sticky top-0 z-50 bg-navy border-b border-slate-700/60 shadow-lg">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
         <a href="/" class="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-            <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center shadow">
-                <i class="fa-solid fa-address-book text-white text-sm"></i>
+            <div class="w-8 h-8 brand-logo rounded-lg flex items-center justify-center shadow">
+                <i class="fa-solid fa-address-book text-slate-50 text-sm"></i>
             </div>
-            <span class="text-lg font-extrabold tracking-tight">Candace <span class="text-brand">Holder</span></span>
+            <span class="text-lg font-extrabold tracking-tight">Candace <span class="brand-text">Holder</span></span>
         </a>
         <nav class="hidden lg:flex items-center gap-6 text-sm text-slate-400">
-            <a href="/" class="hover:text-white transition-colors">Search</a>
-            <a href="/Leads/Saved" class="hover:text-white transition-colors">Saved Leads</a>
-            <a href="/Dashboard" class="hover:text-white transition-colors">Dashboard</a>
-            <a href="/Admin" class="text-orange-400 font-semibold">
+            <a href="/" class="hover:text-brand transition-colors">Search</a>
+            <a href="/Leads/Saved" class="hover:text-brand transition-colors">Saved Leads</a>
+            <a href="/Dashboard" class="hover:text-brand transition-colors">Dashboard</a>
+            <a href="/Admin" class="text-orange-600 font-semibold">
                 <i class="fa-solid fa-shield-halved mr-1 text-xs"></i>Admin
             </a>
             <span class="text-slate-600">|</span>
@@ -46,9 +47,9 @@
 </header>
 
 <!-- Page hero -->
-<div class="border-b border-slate-700/40 bg-gradient-to-r from-slate-900 to-[#0f172a]">
+<div class="border-b border-slate-700/40 hero-band">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <h1 class="text-2xl font-extrabold text-white">
+        <h1 class="text-2xl font-extrabold text-slate-50">
             <i class="fa-solid fa-shield-halved text-brand mr-2"></i>Admin Dashboard
         </h1>
         <p class="text-slate-400 text-sm mt-0.5">Usage across all users</p>
@@ -59,13 +60,13 @@
 
     @if (TempData["AdminOk"] != null)
     {
-        <div class="mb-6 rounded-xl border border-green-500/30 bg-green-500/10 text-green-300 px-4 py-3 text-sm">
+        <div class="mb-6 rounded-xl border border-green-500/30 bg-green-500/10 text-green-700 px-4 py-3 text-sm">
             <i class="fa-solid fa-circle-check mr-2"></i>@TempData["AdminOk"]
         </div>
     }
     @if (TempData["AdminError"] != null)
     {
-        <div class="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 px-4 py-3 text-sm">
+        <div class="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 px-4 py-3 text-sm">
             <i class="fa-solid fa-triangle-exclamation mr-2"></i>@TempData["AdminError"]
         </div>
     }
@@ -74,12 +75,12 @@
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <div class="stat-card">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Users</p>
-            <p class="text-3xl font-extrabold text-white">@totalUsers</p>
+            <p class="text-3xl font-extrabold text-slate-50">@totalUsers</p>
             <p class="text-xs text-slate-500 mt-1">total registered</p>
         </div>
         <div class="stat-card">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Total Leads</p>
-            <p class="text-3xl font-extrabold text-white">@totalLeads</p>
+            <p class="text-3xl font-extrabold text-slate-50">@totalLeads</p>
             <p class="text-xs text-slate-500 mt-1">across all users</p>
         </div>
         <div class="stat-card">
@@ -89,7 +90,7 @@
         </div>
         <div class="stat-card">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Skip Traces</p>
-            <p class="text-3xl font-extrabold text-white">@totalEnrich</p>
+            <p class="text-3xl font-extrabold text-slate-50">@totalEnrich</p>
             <p class="text-xs text-slate-500 mt-1">all time</p>
         </div>
         <div class="stat-card">
@@ -106,7 +107,7 @@
     <!-- Users table -->
     <div class="rounded-2xl border border-slate-700/60 overflow-hidden shadow-xl bg-slate-800/40 mb-6">
         <div class="px-5 py-4 border-b border-slate-700/60 flex items-center justify-between">
-            <h2 class="text-sm font-bold text-white">
+            <h2 class="text-sm font-bold text-slate-50">
                 <i class="fa-solid fa-users text-brand mr-2"></i>Users
                 <span class="ml-2 text-xs font-normal text-slate-400">(@users.Count total)</span>
             </h2>
@@ -141,7 +142,7 @@
                                 <td>
                                     <div class="flex items-start gap-2">
                                         <div>
-                                            <p class="font-semibold text-white text-xs">
+                                            <p class="font-semibold text-slate-50 text-xs">
                                                 @(string.IsNullOrEmpty(u.DisplayName) ? "—" : u.DisplayName)
                                                 @if (u.Role == "super_admin")
                                                 {
@@ -149,7 +150,7 @@
                                                 }
                                                 else if (u.Role == "admin")
                                                 {
-                                                    <span class="ml-1 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold uppercase tracking-wide">Admin</span>
+                                                    <span class="ml-1 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-700 text-[10px] font-bold uppercase tracking-wide">Admin</span>
                                                 }
                                             </p>
                                             <p class="text-slate-500 text-xs">@u.Email</p>
@@ -164,8 +165,8 @@
                                         }
                                     </div>
                                 </td>
-                                <td class="font-semibold text-white">@u.LeadCount</td>
-                                <td class="font-semibold text-white">@u.EnrichCount</td>
+                                <td class="font-semibold text-slate-50">@u.LeadCount</td>
+                                <td class="font-semibold text-slate-50">@u.EnrichCount</td>
                                 <td class="text-slate-400 whitespace-nowrap">@lastLead</td>
                                 <td class="text-slate-400 whitespace-nowrap">@joined</td>
                                 @if (isSuperAdmin)
@@ -185,7 +186,7 @@
                                                 }
                                                 else
                                                 {
-                                                    <button type="submit" name="role" value="admin" class="px-2.5 py-1.5 rounded-lg bg-blue-600/80 hover:bg-blue-600 text-white text-xs">Make admin</button>
+                                                    <button type="submit" name="role" value="admin" class="px-2.5 py-1.5 rounded-lg bg-blue-600/80 hover:bg-blue-600 text-slate-50 text-xs">Make admin</button>
                                                 }
                                             </form>
                                         }
@@ -213,10 +214,10 @@
 <div id="emailModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background: rgba(0,0,0,0.6);">
     <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg">
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
-            <h3 class="text-white font-bold text-sm">
+            <h3 class="text-slate-50 font-bold text-sm">
                 <i class="fa-solid fa-envelope text-brand mr-2"></i>Email <span id="emailModalName" class="text-slate-400 font-normal"></span>
             </h3>
-            <button type="button" onclick="closeEmailModal()" class="text-slate-500 hover:text-white transition-colors">
+            <button type="button" onclick="closeEmailModal()" class="text-slate-500 hover:text-brand transition-colors">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
@@ -225,7 +226,7 @@
             <div>
                 <label class="block text-xs text-slate-400 mb-1">Template</label>
                 <select id="emailTemplateSelect" onchange="applyEmailTemplate()"
-                        class="w-full bg-slate-900 border border-slate-600 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-brand">
+                        class="w-full bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-50 px-3 py-2 focus:outline-none focus:border-brand">
                     <option value="blank">Custom (blank)</option>
                     <option value="checkin">Check-in / re-engagement</option>
                 </select>
@@ -238,12 +239,12 @@
             <div>
                 <label class="block text-xs text-slate-400 mb-1">Subject</label>
                 <input id="emailSubject" name="subject" type="text" required
-                       class="w-full bg-slate-900 border border-slate-600 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-brand" />
+                       class="w-full bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-50 px-3 py-2 focus:outline-none focus:border-brand" />
             </div>
             <div>
                 <label class="block text-xs text-slate-400 mb-1">Message</label>
                 <textarea id="emailBody" name="body" rows="9" required
-                          class="w-full bg-slate-900 border border-slate-600 rounded-lg text-sm text-white px-3 py-2 focus:outline-none focus:border-brand"></textarea>
+                          class="w-full bg-slate-900 border border-slate-600 rounded-lg text-sm text-slate-50 px-3 py-2 focus:outline-none focus:border-brand"></textarea>
                 <p class="text-xs text-slate-500 mt-1">Feel free to edit the template text before sending.</p>
             </div>
             <div class="flex justify-end gap-2 pt-2">
