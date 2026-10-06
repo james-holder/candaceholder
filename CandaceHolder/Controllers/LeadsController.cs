@@ -43,10 +43,10 @@ namespace CandaceHolder.Controllers
         private bool HasSkipTraceProvider =>
             !string.IsNullOrWhiteSpace(_config["Regrid:Token"]) ||
             !string.IsNullOrWhiteSpace(_config["WhitepagesPro:ApiKey"]) ||
-            !string.IsNullOrWhiteSpace(_config["BatchSkipTracing:ApiKey"]);
+            !string.IsNullOrWhiteSpace(_config["BatchData:ApiKey"]);
 
         private const string NoProviderError =
-            "No skip-trace provider is set up. Add a Regrid, Whitepages Pro, or BatchSkipTracing key.";
+            "No skip-trace provider is set up. Add a BatchData (or Whitepages Pro / Regrid) key.";
 
         // Loads a lead only if it belongs to the caller's org.
         private Task<Lead?> FindOwnLeadAsync(long id)
@@ -115,6 +115,7 @@ namespace CandaceHolder.Controllers
                     l.YearBuilt, l.IsEnriched, l.Status,
                     Contacts = l.Contacts.Select(c => new {
                         c.Id, c.Name, c.Phone, c.Email,
+                        c.PhoneType, c.IsDnc, c.IsLitigator,
                         c.ContactType, c.IsPrimary, c.Source
                     }).ToList()
                 })
@@ -200,13 +201,21 @@ namespace CandaceHolder.Controllers
             var lead = await FindOwnLeadAsync(id);
             if (lead == null) return NotFound(new { error = "Lead not found." });
 
-            return Json(await EnrichLeadAsync(lead));
+            var status = (await SkipTraceAsync(new List<Lead> { lead }))[lead.Id];
+            if (status == "error")
+                return StatusCode(502, new { error = ProviderFailedError });
+
+            return Json(new { status, ownerName = lead.OwnerName, yearBuilt = lead.YearBuilt,
+                              ownerPhone = lead.OwnerPhone, ownerEmail = lead.OwnerEmail });
         }
 
         // ── POST /Leads/BulkEnrich ───────────────────────────────────
-        // Each lookup is billed by the skip-trace provider and runs
-        // sequentially in this request, so cap the batch size.
-        private const int MaxBulkTrace = 100;
+        // Each match is billed by the skip-trace provider, so cap the
+        // batch at one BatchData request's worth.
+        private const int MaxBulkTrace = RealDataService.BatchDataMaxPerRequest;
+
+        private const string ProviderFailedError =
+            "The skip-trace provider request failed — check the API key and account balance, then try again.";
 
         [HttpPost("BulkEnrich")]
         public async Task<IActionResult> BulkEnrich([FromBody] BulkRequest req)
@@ -228,14 +237,17 @@ namespace CandaceHolder.Controllers
                             !l.IsEnriched && l.DeletedAt == null)
                 .ToListAsync();
 
-            var results = new List<object>();
-            foreach (var lead in leads)
-            {
-                var r = await EnrichLeadAsync(lead);
-                results.Add(new { id = lead.Id, result = r });
-            }
+            var outcome = await SkipTraceAsync(leads);
+            var errors  = outcome.Values.Count(v => v == "error");
+            if (leads.Count > 0 && errors == leads.Count)
+                return StatusCode(502, new { error = ProviderFailedError });
 
-            return Json(new { processed = results.Count, results });
+            return Json(new
+            {
+                processed = leads.Count,
+                errors,
+                results   = outcome.Select(o => new { id = o.Key, result = new { status = o.Value } })
+            });
         }
 
         // ── PATCH /Leads/{id}/Notes ─────────────────────────────────
@@ -348,120 +360,169 @@ namespace CandaceHolder.Controllers
         }
 
         // ─────────────────────────────────────────────────────────────
-        // Shared enrichment logic
+        // Shared skip-trace logic, used by single and bulk endpoints.
+        //   1. Regrid (if configured)    — owner name + year built
+        //   2. BatchData (if configured) — owner name, phones, emails;
+        //      one request per 100 leads. Otherwise Whitepages Pro, one
+        //      request per lead.
+        // Returns each lead's outcome: "completed", "not_found", or
+        // "error" (provider request failed — lead is left untraced so it
+        // can be retried).
         // ─────────────────────────────────────────────────────────────
-        private async Task<object> EnrichLeadAsync(Lead lead)
+        private async Task<Dictionary<long, string>> SkipTraceAsync(List<Lead> leads)
         {
-            var services  = HttpContext.RequestServices;
-            var config    = services.GetService<IConfiguration>();
-            var realData  = services.GetRequiredService<RealDataService>();
-            var bstApiKey = config?["BatchSkipTracing:ApiKey"];
-            var wpApiKey  = config?["WhitepagesPro:ApiKey"];
-
-            string? ownerName = null;
-            int?    yearBuilt = null;
-            string  provider  = "regrid";
-            string  status    = "not_found";
+            var bdKey    = _config["BatchData:ApiKey"];
+            var wpKey    = _config["WhitepagesPro:ApiKey"];
+            var outcome  = leads.ToDictionary(l => l.Id, _ => "not_found");
+            var provider = !string.IsNullOrWhiteSpace(bdKey) ? "batchdata"
+                         : !string.IsNullOrWhiteSpace(wpKey) ? "whitepages"
+                         : "regrid";
 
             // ── Step 1: Regrid — owner name + year built ─────────────
-            var parcel = await realData.GetRegridParcelDataAsync(
-                lead.Lat ?? 0, lead.Lng ?? 0, lead.Address);
-
-            if (parcel != null)
+            if (!string.IsNullOrWhiteSpace(_config["Regrid:Token"]))
             {
-                ownerName = parcel.OwnerName;
-                yearBuilt = parcel.YearBuilt;
-                status    = "completed";
-
-                if (ownerName != null && lead.OwnerName == null)
-                    lead.OwnerName = ownerName;
-                if (yearBuilt != null)
-                    lead.YearBuilt = yearBuilt;
+                foreach (var lead in leads)
+                {
+                    var parcel = await _realData.GetRegridParcelDataAsync(lead.Lat ?? 0, lead.Lng ?? 0, lead.Address);
+                    if (parcel == null) continue;
+                    if (parcel.OwnerName != null && lead.OwnerName == null) lead.OwnerName = parcel.OwnerName;
+                    if (parcel.YearBuilt != null) lead.YearBuilt = parcel.YearBuilt;
+                    outcome[lead.Id] = "completed";
+                }
             }
 
-            // ── Step 2: Whitepages Pro — phone + email ────────────────
-            if (!string.IsNullOrWhiteSpace(wpApiKey))
+            // ── Step 2a: BatchData — batched ─────────────────────────
+            if (!string.IsNullOrWhiteSpace(bdKey))
             {
-                provider = "whitepages";
-                var contacts = await realData.GetWhitepagesContactAsync(
-                    wpApiKey, lead.OwnerName, lead.Address);
-
-                if (contacts.Count > 0)
+                foreach (var chunk in leads.Chunk(RealDataService.BatchDataMaxPerRequest))
                 {
-                    // Remove stale contacts from a previous enrich
-                    var old = _db.LeadContacts.Where(c => c.LeadId == lead.Id);
-                    _db.LeadContacts.RemoveRange(old);
-
-                    for (int i = 0; i < contacts.Count; i++)
+                    var results = await _realData.BatchDataSkipTraceAsync(bdKey, chunk.Select(l => l.Address).ToList());
+                    for (int i = 0; i < chunk.Length; i++)
                     {
-                        var c       = contacts[i];
-                        var primary = i == 0;
+                        var lead = chunk[i];
+                        if (results == null) { outcome[lead.Id] = "error"; continue; }
+                        var r = results[i];
+                        if (r == null) continue;
 
-                        _db.LeadContacts.Add(new Data.Models.LeadContact
+                        var contacts = new List<LeadContact>();
+                        for (int p = 0; p < r.Phones.Count; p++)
                         {
-                            LeadId      = lead.Id,
-                            Name        = c.OwnerName,
-                            Phone       = c.Phone,
-                            Email       = c.Email,
-                            ContactType = c.ContactType,
-                            IsPrimary   = primary,
-                            Source      = "whitepages",
-                            CreatedAt   = DateTime.UtcNow
-                        });
-
-                        // Populate legacy fields from the primary contact
-                        if (primary)
-                        {
-                            if (c.OwnerName != null && lead.OwnerName == null)
-                                lead.OwnerName = c.OwnerName;
-                            if (c.Phone != null && lead.OwnerPhone == null)
-                                lead.OwnerPhone = c.Phone;
-                            if (c.Email != null && lead.OwnerEmail == null)
-                                lead.OwnerEmail = c.Email;
+                            contacts.Add(new LeadContact
+                            {
+                                Name        = r.OwnerName,
+                                Phone       = r.Phones[p].Number,
+                                PhoneType   = r.Phones[p].Type,
+                                IsDnc       = r.Phones[p].IsDnc,
+                                IsLitigator = r.IsLitigator,
+                                Email       = p < r.Emails.Count ? r.Emails[p] : null
+                            });
                         }
+                        // Any emails beyond the number of phones get their own rows.
+                        foreach (var email in r.Emails.Skip(r.Phones.Count))
+                            contacts.Add(new LeadContact { Name = r.OwnerName, Email = email, IsLitigator = r.IsLitigator });
+
+                        ReplaceContacts(lead, r.OwnerName, contacts, "batchdata");
+                        outcome[lead.Id] = "completed";
                     }
-
-                    status = "completed";
                 }
             }
-            // ── Step 2b: BatchSkipTracing fallback (if WP not configured) ─
-            else if (!string.IsNullOrWhiteSpace(bstApiKey))
+            // ── Step 2b: Whitepages Pro — one lead at a time ─────────
+            else if (!string.IsNullOrWhiteSpace(wpKey))
             {
-                provider = "batchskiptracing";
-                var contact = await realData.GetBstContactAsync(
-                    bstApiKey, lead.OwnerName, lead.Address);
-
-                if (contact != null)
+                foreach (var lead in leads)
                 {
-                    if (contact.Phone != null && lead.OwnerPhone == null)
-                        lead.OwnerPhone = contact.Phone;
-                    if (contact.Email != null && lead.OwnerEmail == null)
-                        lead.OwnerEmail = contact.Email;
-
-                    status = "completed";
+                    var found = await _realData.GetWhitepagesContactAsync(wpKey, lead.OwnerName, lead.Address);
+                    if (found.Count == 0) continue;
+                    var contacts = found.Select(c => new LeadContact
+                    {
+                        Name = c.OwnerName, Phone = c.Phone, Email = c.Email, ContactType = c.ContactType
+                    }).ToList();
+                    ReplaceContacts(lead, found[0].OwnerName, contacts, "whitepages");
+                    outcome[lead.Id] = "completed";
                 }
             }
 
-            // Always mark as enriched once a lookup has been attempted —
-            // even "not_found" results move the lead out of the unenriched queue
-            // so it doesn't get retried repeatedly. The Enrichments record captures
-            // the actual outcome (completed vs not_found).
-            lead.IsEnriched = true;
-
-            _db.Enrichments.Add(new Enrichment
+            // Record every attempt. Leads whose lookup actually ran are marked
+            // traced (even with no match) so they aren't re-billed by accident;
+            // provider errors leave the lead untraced so it can be retried.
+            foreach (var lead in leads)
             {
-                UserId      = CurrentUserId,
-                LeadId      = lead.Id,
-                Address     = lead.Address,
-                Status      = status,
-                Provider    = provider,
-                CreditsUsed = 1,
-                CreatedAt   = DateTime.UtcNow
-            });
+                if (outcome[lead.Id] != "error") lead.IsEnriched = true;
+                _db.Enrichments.Add(new Enrichment
+                {
+                    UserId      = CurrentUserId,
+                    LeadId      = lead.Id,
+                    Address     = lead.Address,
+                    Status      = outcome[lead.Id],
+                    Provider    = provider,
+                    CreditsUsed = outcome[lead.Id] == "completed" ? 1 : 0,
+                    CreatedAt   = DateTime.UtcNow
+                });
+            }
 
             await _db.SaveChangesAsync();
+            return outcome;
+        }
 
-            return new { status, ownerName, yearBuilt, ownerPhone = lead.OwnerPhone, ownerEmail = lead.OwnerEmail };
+        // Swaps a lead's contacts for a fresh skip-trace result and fills the
+        // lead's owner fields (without overwriting anything typed in by hand).
+        private void ReplaceContacts(Lead lead, string? ownerName, List<LeadContact> contacts, string source)
+        {
+            _db.LeadContacts.RemoveRange(_db.LeadContacts.Where(c => c.LeadId == lead.Id));
+
+            for (int i = 0; i < contacts.Count; i++)
+            {
+                var c = contacts[i];
+                c.LeadId    = lead.Id;
+                c.IsPrimary = i == 0;
+                c.Source    = source;
+                c.CreatedAt = DateTime.UtcNow;
+                _db.LeadContacts.Add(c);
+            }
+
+            if (ownerName != null && lead.OwnerName == null)
+                lead.OwnerName = ownerName;
+            // Prefer a callable number: first phone that isn't on a Do Not Call list.
+            var phone = contacts.FirstOrDefault(c => c.Phone != null && !c.IsDnc && !c.IsLitigator)?.Phone
+                     ?? contacts.FirstOrDefault(c => c.Phone != null)?.Phone;
+            if (phone != null && lead.OwnerPhone == null)
+                lead.OwnerPhone = phone;
+            var email = contacts.FirstOrDefault(c => c.Email != null)?.Email;
+            if (email != null && lead.OwnerEmail == null)
+                lead.OwnerEmail = email;
+        }
+
+        // ── GET /Leads/BatchDataDebug — parse BatchData's documented sample ──
+        // Dev-only — checks the response parser without spending credits.
+        [HttpGet("BatchDataDebug")]
+        public IActionResult BatchDataDebug()
+        {
+            if (!_env.IsDevelopment())
+                return NotFound();
+
+            const string sampleJson = """
+            {
+              "status": { "code": 200, "text": "OK" },
+              "results": {
+                "persons": [
+                  {
+                    "dnc": { "tcpa": false },
+                    "emails": [ { "email": "johndoe@gmail.net" } ],
+                    "name": { "first": "john", "last": "doe" },
+                    "phoneNumbers": [
+                      { "number": "1111111111", "type": "Mobile", "score": 100 },
+                      { "number": "2222222222", "type": "Land Line", "dnc": true, "score": 95 }
+                    ],
+                    "litigator": false,
+                    "meta": { "matched": true, "error": false }
+                  },
+                  { "meta": { "matched": false, "error": false } }
+                ],
+                "meta": { "results": { "requestCount": 2, "matchCount": 1, "noMatchCount": 1, "errorCount": 0 } }
+              }
+            }
+            """;
+            return Json(RealDataService.ParseBatchDataResponse(sampleJson, 2));
         }
 
         // ── GET /Leads/WpDebug?name=John+Smith&address=123+Main+St,Dallas,TX+75201 ──

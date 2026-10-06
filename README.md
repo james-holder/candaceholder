@@ -26,8 +26,8 @@ A private web app for finding addresses in an area and skip tracing their owners
 | Addresses in an area | OpenStreetMap Overpass (free, no key) | — |
 | Address fallback + geocoding + autocomplete | Google Maps | `GoogleMaps:ApiKey` |
 | Street basemap (optional) | MapTiler | `MapTiler:ApiKey` |
-| Owner name + year built | Regrid | `Regrid:Token` |
-| Phone + email | Whitepages Pro (preferred) or BatchSkipTracing | `WhitepagesPro:ApiKey`, `BatchSkipTracing:ApiKey` |
+| Year built (optional) | Regrid | `Regrid:Token` |
+| Owner name, phones (with DNC / litigator flags), emails | BatchData (preferred) or Whitepages Pro | `BatchData:ApiKey`, `WhitepagesPro:ApiKey` |
 | Password resets, team invites | Any SMTP server | `Email:*` |
 
 Any provider left blank is skipped. Skip-trace lookups are billed by the provider.

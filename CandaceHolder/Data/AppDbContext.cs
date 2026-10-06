@@ -149,9 +149,12 @@ namespace CandaceHolder.Data
                 e.Property(c => c.Name).HasColumnName("name");
                 e.Property(c => c.Phone).HasColumnName("phone");
                 e.Property(c => c.Email).HasColumnName("email");
+                e.Property(c => c.PhoneType).HasColumnName("phone_type");
+                e.Property(c => c.IsDnc).HasColumnName("is_dnc").HasDefaultValue(false);
+                e.Property(c => c.IsLitigator).HasColumnName("is_litigator").HasDefaultValue(false);
                 e.Property(c => c.ContactType).HasColumnName("contact_type").HasDefaultValue("owner");
                 e.Property(c => c.IsPrimary).HasColumnName("is_primary").HasDefaultValue(false);
-                e.Property(c => c.Source).HasColumnName("source").HasDefaultValue("whitepages");
+                e.Property(c => c.Source).HasColumnName("source").HasDefaultValue("batchdata");
                 e.Property(c => c.CreatedAt).HasColumnName("created_at")
                  .HasDefaultValueSql("datetime('now')");
 

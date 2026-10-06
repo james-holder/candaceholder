@@ -444,7 +444,8 @@ function buildRow(lead) {
         ? '<span class="block text-xs text-slate-500">+' + (lead.contacts.length - 1) + ' more contact' + (lead.contacts.length > 2 ? 's' : '') + '</span>'
         : '';
     const phoneCell = lead.ownerPhone
-        ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="text-green-600 hover:text-green-700 whitespace-nowrap">' + escapeHtml(lead.ownerPhone) + '</a>' + extraContacts
+        ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="text-green-600 hover:text-green-700 whitespace-nowrap">' + escapeHtml(lead.ownerPhone) + '</a>' +
+          contactWarning(lead) + extraContacts
         : '<span class="text-slate-600">—</span>';
     const emailCell = lead.ownerEmail
         ? '<a href="mailto:' + escapeAttr(lead.ownerEmail) + '" class="text-indigo-700 hover:text-indigo-700 truncate block" style="max-width:200px">' + escapeHtml(lead.ownerEmail) + '</a>'
@@ -461,6 +462,15 @@ function buildRow(lead) {
         statusCell +
         '<td class="sticky-actions">' + ac + '</td></tr>' +
         editExpRow + notesExpRow;
+}
+
+// DNC / litigator badge for the lead's main phone (flags come from the skip trace)
+function contactWarning(lead) {
+    var c = (lead.contacts || []).find(function(x) { return x.phone === lead.ownerPhone; });
+    if (!c) return '';
+    if (c.isLitigator) return ' <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700" title="Known TCPA litigator, do not contact">LITIGATOR</span>';
+    if (c.isDnc)       return ' <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700" title="On a Do Not Call list, do not cold call or text">DNC</span>';
+    return '';
 }
 
 // ── Row actions ───────────────────────────────────────────────────
@@ -522,7 +532,7 @@ async function enrichLead(id, btn) {
 // One row per contact (so multiple phones/emails from a skip trace all
 // come through), falling back to the lead's owner fields.
 function exportCSV(leadsOverride) {
-    var header = ['Address','Owner / Contact Name','Phone','Email','Contact Type','Is Primary',
+    var header = ['Address','Owner / Contact Name','Phone','Phone Type','DNC','Litigator','Email','Contact Type','Is Primary',
                   'Year Built','Traced','Status','Notes','Source','Saved At'];
 
     function q(v) { return '"' + (v == null ? '' : v).toString().replace(/"/g,'""') + '"'; }
@@ -535,10 +545,11 @@ function exportCSV(leadsOverride) {
         var contacts = (l.contacts && l.contacts.length > 0) ? l.contacts : null;
         if (contacts) {
             contacts.forEach(function(c) {
-                rows.push([q(l.address), q(c.name), q(c.phone), q(c.email), q(c.contactType), q(c.isPrimary ? 'Yes' : 'No')].concat(tail).join(','));
+                rows.push([q(l.address), q(c.name), q(c.phone), q(c.phoneType), q(c.isDnc ? 'Yes' : ''), q(c.isLitigator ? 'Yes' : ''),
+                           q(c.email), q(c.contactType), q(c.isPrimary ? 'Yes' : 'No')].concat(tail).join(','));
             });
         } else {
-            rows.push([q(l.address), q(l.ownerName), q(l.ownerPhone), q(l.ownerEmail), q('owner'), q('Yes')].concat(tail).join(','));
+            rows.push([q(l.address), q(l.ownerName), q(l.ownerPhone), q(''), q(''), q(''), q(l.ownerEmail), q('owner'), q('Yes')].concat(tail).join(','));
         }
     });
 
@@ -584,7 +595,7 @@ function buildMobileCard(lead) {
     }
 
     const phoneHtml = lead.ownerPhone
-        ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/15 border border-green-500/30 text-green-600 text-sm font-semibold active:bg-green-500/30 transition"><i class="fa-solid fa-phone"></i>' + escapeHtml(lead.ownerPhone) + '</a>'
+        ? contactWarning(lead).replace('ml-1 ', 'self-center ') + '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-green-500/15 border border-green-500/30 text-green-600 text-sm font-semibold active:bg-green-500/30 transition"><i class="fa-solid fa-phone"></i>' + escapeHtml(lead.ownerPhone) + '</a>'
         : '<span class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-700/40 border border-slate-600/60 text-slate-500 text-sm"><i class="fa-solid fa-phone-slash"></i>No phone yet</span>';
 
     const tracedBadge = lead.isEnriched

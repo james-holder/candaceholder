@@ -13,6 +13,7 @@
     };
     var statusCssClass = "status-" + (statusCssMap.ContainsKey(Model.Status) ? statusCssMap[Model.Status] : "new");
     var canEnrich = (bool)(ViewBag.CanEnrich ?? false);
+    var ownerPhoneContact = Model.Contacts.FirstOrDefault(c => c.Phone == Model.OwnerPhone);
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -253,6 +254,12 @@
                         <a href="tel:@Model.OwnerPhone" class="contact-action contact-action-call w-full">
                             <i class="fa-solid fa-phone text-xs"></i>@Model.OwnerPhone
                         </a>
+                        @if (ownerPhoneContact?.IsDnc == true || ownerPhoneContact?.IsLitigator == true) {
+                            <p class="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">
+                                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                                @(ownerPhoneContact.IsLitigator ? "Known TCPA litigator — don't contact." : "On a Do Not Call list — don't cold call or text.")
+                            </p>
+                        }
                     } else {
                         <div class="contact-action w-full border-slate-700 text-slate-600 cursor-default">
                             <i class="fa-solid fa-phone-slash text-xs"></i>No phone yet
@@ -329,6 +336,9 @@
                                 <span class="px-1.5 py-0.5 rounded-full text-xs font-semibold @(contact.ContactType == "owner" ? "bg-orange-500/15 text-orange-600 border border-orange-500/20" : "bg-slate-700 text-slate-400 border border-slate-600")">
                                     @contact.ContactType
                                 </span>
+                                @if (contact.IsLitigator) {
+                                    <span class="px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200" title="Known TCPA litigator — don't contact">Litigator</span>
+                                }
                                 <span class="text-xs text-slate-600">via @contact.Source</span>
                             </div>
                         </div>
@@ -338,8 +348,14 @@
                 <div class="flex flex-wrap gap-2">
                     @if (!string.IsNullOrEmpty(contact.Phone)) {
                         <a href="tel:@contact.Phone" class="contact-action contact-action-call">
-                            <i class="fa-solid fa-phone text-xs"></i>@contact.Phone
+                            <i class="fa-solid @(contact.PhoneType?.Contains("Mobile", StringComparison.OrdinalIgnoreCase) == true ? "fa-mobile-screen" : "fa-phone") text-xs"></i>@contact.Phone
+                            @if (!string.IsNullOrEmpty(contact.PhoneType)) {
+                                <span class="text-[10px] font-semibold opacity-70">@contact.PhoneType</span>
+                            }
                         </a>
+                        @if (contact.IsDnc) {
+                            <span class="self-center px-1.5 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700 border border-red-200" title="On a Do Not Call list — don't cold call or text">DNC</span>
+                        }
                     }
                     @if (!string.IsNullOrEmpty(contact.Email)) {
                         <a href="mailto:@contact.Email" class="contact-action contact-action-email">
@@ -357,7 +373,8 @@
         <div class="mt-4 p-4 rounded-xl bg-slate-800/50 border border-slate-700/60">
             <p class="text-xs text-slate-500">
                 <i class="fa-solid fa-shield-halved mr-1.5 text-slate-600"></i>
-                Numbers aren't checked against the Do Not Call registry. Verify a number before calling or texting.
+                <b>DNC</b> = on a Do Not Call list. <b>Litigator</b> = known for suing over calls and texts. Don't cold call or text either one,
+                and honor any opt-out request right away.
             </p>
         </div>
 

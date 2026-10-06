@@ -62,14 +62,15 @@
 
     <section id="trace" class="doc-section">
         <h2 class="text-xl font-bold text-slate-50 mb-3"><i class="fa-solid fa-magnifying-glass-dollar text-brand mr-2"></i>3. Skip trace</h2>
-        <p class="mb-3">On <b class="text-slate-50">Saved Leads</b>, click the <i class="fa-solid fa-magnifying-glass-dollar text-orange-600"></i> button on a row, or tick several rows and use <b class="text-slate-50">Skip Trace</b> in the toolbar (up to 100 at a time). Each lookup:</p>
-        <ol class="list-decimal pl-6 space-y-2">
-            <li>Looks up the owner's name and year built from county parcel records (Regrid).</li>
-            <li>Looks up phone numbers and emails (Whitepages Pro if configured, otherwise BatchSkipTracing).</li>
-        </ol>
+        <p class="mb-3">On <b class="text-slate-50">Saved Leads</b>, click the <i class="fa-solid fa-magnifying-glass-dollar text-orange-600"></i> button on a row, or tick several rows and use <b class="text-slate-50">Skip Trace</b> in the toolbar (up to 100 at a time).</p>
+        <p class="mb-3">Each lookup goes to BatchData, which returns the owner's name, their phone numbers (mobile first) and email addresses. You're only charged when it finds a match.</p>
+        <ul class="list-disc pl-6 space-y-2">
+            <li><span class="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-xs font-bold">DNC</span> marks a number on a Do Not Call list — don't cold call or text it.</li>
+            <li><span class="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-xs font-bold">Litigator</span> marks a person known for suing over calls and texts — don't contact them.</li>
+        </ul>
         <div class="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
             <i class="fa-solid fa-dollar-sign mr-1.5"></i>
-            Every skip trace is billed by the provider, even when nothing is found. Only owners and managers can run skip traces.
+            Every matched skip trace is billed by BatchData. Only owners and managers can run skip traces.
         </div>
     </section>
 
@@ -85,7 +86,7 @@
 
     <section id="compliance" class="doc-section">
         <h2 class="text-xl font-bold text-slate-50 mb-3"><i class="fa-solid fa-shield-halved text-brand mr-2"></i>Before you call or text</h2>
-        <p>Phone numbers are <b class="text-slate-50">not</b> checked against the National Do Not Call Registry. Check numbers before calling or texting, and follow TCPA rules for texts and autodialed calls.</p>
+        <p>BatchData flags Do Not Call numbers and known litigators, and leaves out numbers with TCPA restrictions. Still follow TCPA rules for texts and autodialed calls, and honor any opt-out request right away.</p>
     </section>
 
     <section id="team" class="doc-section">

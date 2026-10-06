@@ -88,9 +88,10 @@ builder.Services.AddHttpClient("regrid", c =>
 {
     c.Timeout = TimeSpan.FromSeconds(15);
 });
-builder.Services.AddHttpClient("bst", c =>
+builder.Services.AddHttpClient("batchdata", c =>
 {
-    c.Timeout = TimeSpan.FromSeconds(20);
+    // A full 100-address batch can take a while on BatchData's side.
+    c.Timeout = TimeSpan.FromSeconds(120);
     c.DefaultRequestHeaders.Add("User-Agent", "CandaceHolder/1.0");
 });
 builder.Services.AddHttpClient("whitepages", c =>
@@ -111,9 +112,26 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    // Fresh database for this app — EnsureCreated builds every table from
-    // AppDbContext's model, so there are no legacy schema patches to apply.
+    // EnsureCreated builds every table from AppDbContext's model on a fresh
+    // database, but never alters an existing one — so columns added after the
+    // first deploy are patched in below.
     db.Database.EnsureCreated();
+
+    var conn = db.Database.GetDbConnection();
+    conn.Open();
+    void AddColumnIfMissing(string table, string column, string definition)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
+        if (Convert.ToInt32(cmd.ExecuteScalar()) > 0) return;
+        cmd.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
+        cmd.ExecuteNonQuery();
+    }
+
+    // 2026-10-06: BatchData skip tracing — phone type + Do Not Call / litigator flags
+    AddColumnIfMissing("lead_contacts", "phone_type",   "TEXT");
+    AddColumnIfMissing("lead_contacts", "is_dnc",       "INTEGER NOT NULL DEFAULT 0");
+    AddColumnIfMissing("lead_contacts", "is_litigator", "INTEGER NOT NULL DEFAULT 0");
 
     // ── Dev-only seed login ───────────────────────────────────────────────
     // Gives you a ready-to-use account at /Auth/Login on localhost without
@@ -165,6 +183,8 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("──────────────────────────────────────────────────");
         }
     }
+
+    conn.Close();
 }
 
 if (!app.Environment.IsDevelopment())

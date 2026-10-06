@@ -7,7 +7,7 @@ namespace CandaceHolder.Services
     ///   1. OpenStreetMap Overpass API  — real nearby addresses   (no key needed)
     ///   2. Google reverse-geocode grid — address fallback        (GoogleMaps:ApiKey)
     ///   3. Regrid Parcel API           — property owner names     (free 25/day token)
-    ///   4. BatchSkipTracing / Whitepages Pro — skip tracing (phone + email)
+    ///   4. BatchData / Whitepages Pro  — skip tracing (owner, phones, emails)
     ///
     /// Sign-ups:
     ///   Regrid  → https://app.regrid.com  (free Starter account, 25 lookups/day)
@@ -427,96 +427,159 @@ out center;";
 
 
         // ─────────────────────────────────────────────────────────────────
-        // 4. BatchSkipTracing  -  phone + email lookup
-        //    Sign up: https://batchskiptracing.com
-        //    Config:  "BatchSkipTracing": { "ApiKey": "..." }
+        // 4. BatchData  -  owner name + phones + emails (skip trace)
+        //    Sign up: https://batchdata.com   (formerly BatchSkipTracing)
+        //    Config:  "BatchData": { "ApiKey": "..." }
+        //    Docs:    https://developer.batchdata.com/docs/batchdata/batchdata-v1/operations/create-a-property-skip-trace
+        //    Billed per MATCHED property only. Up to 100 properties per request.
+        //    By default BatchData drops TCPA-blacklisted phones and puts mobiles first.
         // ─────────────────────────────────────────────────────────────────
-        public record BstContactData(string? Phone, string? Email);
+        public const int BatchDataMaxPerRequest = 100;
 
-        public async Task<BstContactData?> GetBstContactAsync(
-            string apiKey, string? ownerName, string address)
+        public record SkipTracePhone(string Number, string? Type, bool IsDnc);
+        public record SkipTraceResult(string? OwnerName, List<SkipTracePhone> Phones, List<string> Emails, bool IsLitigator);
+
+        /// <summary>
+        /// Skip traces up to 100 addresses in one request. The returned list lines up
+        /// with <paramref name="addresses"/>: a result for a match, null for no match.
+        /// Returns null (the whole list) if the request itself failed.
+        /// </summary>
+        public async Task<List<SkipTraceResult?>?> BatchDataSkipTraceAsync(
+            string apiKey, IReadOnlyList<string> addresses)
         {
+            if (addresses.Count == 0) return new();
+            if (addresses.Count > BatchDataMaxPerRequest)
+                throw new ArgumentException($"BatchData accepts at most {BatchDataMaxPerRequest} properties per request.");
+
+            var payload = new
+            {
+                requests = addresses.Select(a =>
+                {
+                    var (street, city, state, zip) = SplitAddress(a);
+                    return new { propertyAddress = new { street, city, state, zip } };
+                }).ToArray()
+            };
+
             try
             {
-                var nameParts = (ownerName ?? "").Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-                var firstName = nameParts.Length > 0 ? nameParts[0] : "";
-                var lastName  = nameParts.Length > 1 ? nameParts[1] : "";
-
-                var cleaned  = address.Replace(", USA", "").Replace(", United States", "");
-                var parts    = cleaned.Split(',');
-                var street   = parts.Length > 0 ? parts[0].Trim() : cleaned;
-                var city     = parts.Length > 1 ? parts[1].Trim() : "";
-                var stateZip = parts.Length > 2 ? parts[2].Trim().Split(' ') : System.Array.Empty<string>();
-                var state    = stateZip.Length > 0 ? stateZip[0].ToUpperInvariant() : "";
-                var zip      = stateZip.Length > 1 ? stateZip[1] : "";
-
-                var payload = new { firstName, lastName, address = street, city, state, zip };
-                var json    = JsonSerializer.Serialize(payload);
-                var content = new System.Net.Http.StringContent(
-                    json, System.Text.Encoding.UTF8, "application/json");
-
-                using var client = _httpFactory.CreateClient("bst");
-                client.DefaultRequestHeaders.Authorization =
+                using var client  = _httpFactory.CreateClient("batchdata");
+                using var request = new HttpRequestMessage(HttpMethod.Post,
+                    "https://api.batchdata.com/api/v1/property/skip-trace")
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload),
+                                                System.Text.Encoding.UTF8, "application/json")
+                };
+                request.Headers.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
-                client.Timeout = TimeSpan.FromSeconds(20);
+                request.Headers.Accept.ParseAdd("application/json");
 
-                var resp = await client.PostAsync(
-                    "https://api.batchskiptracing.com/api/lead", content);
+                var resp = await client.SendAsync(request);
                 var body = await resp.Content.ReadAsStringAsync();
 
-                _logger.LogInformation("BST {Status} for {Address}: {Body}",
-                    resp.StatusCode, address, body.Length > 400 ? body[..400] : body);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("BatchData skip trace returned {Status}: {Body}",
+                        (int)resp.StatusCode, body.Length > 500 ? body[..500] : body);
+                    return null;
+                }
 
-                if (!resp.IsSuccessStatusCode) return null;
-                return ParseBstResponse(body);
+                var results = ParseBatchDataResponse(body, addresses.Count);
+                _logger.LogInformation("BatchData skip trace: {Matched}/{Total} matched",
+                    results.Count(r => r != null), addresses.Count);
+                return results;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "BST call failed for {Address}", address);
+                _logger.LogError(ex, "BatchData skip trace failed for {Count} address(es)", addresses.Count);
                 return null;
             }
         }
 
-        private static BstContactData? ParseBstResponse(string json)
+        public static List<SkipTraceResult?> ParseBatchDataResponse(string json, int expected)
         {
-            try
+            var list = new List<SkipTraceResult?>();
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("results", out var results) ||
+                !results.TryGetProperty("persons", out var persons) ||
+                persons.ValueKind != JsonValueKind.Array)
+                return Enumerable.Repeat<SkipTraceResult?>(null, expected).ToList();
+
+            // V1 returns one entry per requested property, in request order.
+            foreach (var p in persons.EnumerateArray())
             {
-                using var doc = JsonDocument.Parse(json);
-                var output = doc.RootElement.TryGetProperty("output", out var o)
-                               ? o : doc.RootElement;
+                var matched = p.TryGetProperty("meta", out var meta) &&
+                              meta.TryGetProperty("matched", out var m) && m.ValueKind == JsonValueKind.True;
+                if (!matched) { list.Add(null); continue; }
 
-                string? phone = null;
-                string? email = null;
-
-                if (output.TryGetProperty("phones", out var phones) &&
-                    phones.ValueKind == JsonValueKind.Array)
+                string? ownerName = null;
+                if (p.TryGetProperty("name", out var name))
                 {
-                    foreach (var p in phones.EnumerateArray())
+                    var first = name.TryGetProperty("first", out var f) ? f.GetString() : null;
+                    var last  = name.TryGetProperty("last",  out var l) ? l.GetString() : null;
+                    var full  = string.Join(' ', new[] { first, last }.Where(s => !string.IsNullOrWhiteSpace(s)));
+                    if (full.Length > 0) ownerName = TitleCase(full);
+                }
+
+                // Person-level "dnc" object — exact shape isn't documented, so treat any
+                // true-valued flag inside it as "this person is on a Do Not Call list".
+                var personDnc = p.TryGetProperty("dnc", out var dncObj) && AnyTrue(dncObj);
+
+                var phones = new List<SkipTracePhone>();
+                if (p.TryGetProperty("phoneNumbers", out var nums) && nums.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var n in nums.EnumerateArray())
                     {
-                        var num = p.TryGetProperty("phone", out var pv) ? pv.GetString() : null;
-                        var type = p.TryGetProperty("phoneType", out var tv) ? tv.GetString() : null;
-                        if (num == null) continue;
-                        if (phone == null) phone = num;
-                        if (type != null &&
-                            type.Contains("Mobile", StringComparison.OrdinalIgnoreCase))
-                        { phone = num; break; }
+                        var number = n.TryGetProperty("number", out var nv) ? nv.GetString() : null;
+                        if (string.IsNullOrWhiteSpace(number)) continue;
+                        var type = n.TryGetProperty("type", out var tv) ? tv.GetString() : null;
+                        var dnc  = personDnc ||
+                                   (n.TryGetProperty("dnc", out var dv) && AnyTrue(dv));
+                        phones.Add(new SkipTracePhone(FormatPhone(number), type, dnc));
                     }
                 }
 
-                if (output.TryGetProperty("emails", out var emails) &&
-                    emails.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var e in emails.EnumerateArray())
-                    {
-                        var addr = e.TryGetProperty("email", out var ev) ? ev.GetString() : null;
-                        if (addr != null) { email = addr; break; }
-                    }
-                }
+                var emails = new List<string>();
+                if (p.TryGetProperty("emails", out var ems) && ems.ValueKind == JsonValueKind.Array)
+                    foreach (var e in ems.EnumerateArray())
+                        if (e.TryGetProperty("email", out var ev) && ev.GetString() is { Length: > 0 } addr)
+                            emails.Add(addr);
 
-                return (phone == null && email == null) ? null
-                       : new BstContactData(phone, email);
+                var litigator = p.TryGetProperty("litigator", out var lit) && lit.ValueKind == JsonValueKind.True;
+                list.Add(new SkipTraceResult(ownerName, phones, emails, litigator));
             }
-            catch { return null; }
+
+            while (list.Count < expected) list.Add(null);
+            return list;
+        }
+
+        // True for a JSON true, or an object/array containing any true value.
+        private static bool AnyTrue(JsonElement el) => el.ValueKind switch
+        {
+            JsonValueKind.True   => true,
+            JsonValueKind.Object => el.EnumerateObject().Any(p => AnyTrue(p.Value)),
+            JsonValueKind.Array  => el.EnumerateArray().Any(AnyTrue),
+            _                    => false
+        };
+
+        // "2145551234" → "(214) 555-1234"; anything else is returned as-is.
+        private static string FormatPhone(string raw)
+        {
+            var digits = new string(raw.Where(char.IsDigit).ToArray());
+            if (digits.Length == 11 && digits[0] == '1') digits = digits[1..];
+            return digits.Length == 10 ? $"({digits[..3]}) {digits[3..6]}-{digits[6..]}" : raw;
+        }
+
+        // "123 Main St, Dallas, TX 75201, USA" → ("123 Main St", "Dallas", "TX", "75201")
+        public static (string Street, string City, string State, string Zip) SplitAddress(string address)
+        {
+            var cleaned  = address.Replace(", USA", "").Replace(", United States", "");
+            var parts    = cleaned.Split(',');
+            var street   = parts.Length > 0 ? parts[0].Trim() : cleaned.Trim();
+            var city     = parts.Length > 1 ? parts[1].Trim() : "";
+            var stateZip = parts.Length > 2 ? parts[2].Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries) : Array.Empty<string>();
+            var state    = stateZip.Length > 0 ? stateZip[0].ToUpperInvariant() : "";
+            var zip      = stateZip.Length > 1 ? stateZip[1] : "";
+            return (street, city, state, zip);
         }
 
         // ─────────────────────────────────────────────────────────────────
