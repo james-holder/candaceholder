@@ -270,7 +270,10 @@ namespace CandaceHolder.Controllers
                 }
             }
 
-            // Not logged in — show invite info and prompt to sign in
+            // Not logged in — new people create a password here; anyone who
+            // already has an account signs in first.
+            var inviteEmailNorm = invite.Email.Trim().ToLowerInvariant();
+            ViewBag.HasAccount  = await _db.Users.AnyAsync(u => u.Email != null && u.Email.ToLower() == inviteEmailNorm);
             ViewBag.InviteEmail = invite.Email;
             ViewBag.OrgName     = invite.Org?.Name ?? "a team";
             ViewBag.Token       = token;
@@ -313,6 +316,71 @@ namespace CandaceHolder.Controllers
             await _db.SaveChangesAsync();
 
             await RefreshAuthCookieAsync(user);
+
+            ViewBag.Success = true;
+            ViewBag.OrgName = invite.Org?.Name ?? "your team";
+            ViewBag.OrgRole = invite.Role;
+            return View("AcceptInvite");
+        }
+
+        // ── POST /Team/Accept/{token}/Register — new user sets a password ─
+        // Sign-up is closed site-wide, so a valid invite link is what lets a
+        // new person create an account. The email is fixed to the invited
+        // address; the account joins the inviting org with the invited role.
+        [HttpPost("Accept/{token}/Register")]
+        [AllowAnonymous]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AcceptRegister(string token, string name, string password, string confirmPassword)
+        {
+            var invite = await _db.OrgInvites
+                .Include(i => i.Org)
+                .FirstOrDefaultAsync(i => i.Token == token);
+
+            if (invite == null || invite.AcceptedAt != null || invite.ExpiresAt < DateTime.UtcNow)
+            {
+                ViewBag.Error = "This invitation link is no longer valid. Ask your team owner to send a new one.";
+                return View("AcceptInvite");
+            }
+
+            // Re-show the form with an error, keeping what they typed.
+            IActionResult Retry(string message)
+            {
+                ViewBag.InviteEmail = invite.Email;
+                ViewBag.OrgName     = invite.Org?.Name ?? "a team";
+                ViewBag.Token       = token;
+                ViewBag.NeedsLogin  = true;
+                ViewBag.Name        = name;
+                ViewBag.FormError   = message;
+                return View("AcceptInvite");
+            }
+
+            if (string.IsNullOrWhiteSpace(name))       return Retry("Please enter your name.");
+            if ((password ?? "").Length < 8)           return Retry("Password must be at least 8 characters.");
+            if (password != confirmPassword)            return Retry("Passwords don't match.");
+
+            var normalizedEmail = invite.Email.Trim().ToLowerInvariant();
+            if (await _db.Users.AnyAsync(u => u.Provider == "password" && u.ProviderId == normalizedEmail))
+                return Retry("An account with this email already exists — use \"Sign in instead\" below.");
+
+            var user = new User
+            {
+                Provider    = "password",
+                ProviderId  = normalizedEmail,
+                Email       = invite.Email.Trim(),
+                DisplayName = name.Trim(),
+                OrgId       = invite.OrgId,
+                OrgRole     = invite.Role,
+                CreatedAt   = DateTime.UtcNow
+            };
+            user.PasswordHash = new Microsoft.AspNetCore.Identity.PasswordHasher<User>().HashPassword(user, password!);
+            _db.Users.Add(user);
+
+            invite.AcceptedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            await RefreshAuthCookieAsync(user);
+            _logger.LogInformation("Invite accepted with new account: user={UserId} org={OrgId} role={Role}",
+                user.Id, invite.OrgId, invite.Role);
 
             ViewBag.Success = true;
             ViewBag.OrgName = invite.Org?.Name ?? "your team";

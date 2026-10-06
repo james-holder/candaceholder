@@ -6,6 +6,11 @@
     var orgRole    = ViewBag.OrgRole    as string ?? "rep";
     var inviteEmail= ViewBag.InviteEmail as string ?? "";
     var token      = ViewBag.Token      as string ?? "";
+    var hasAccount = ViewBag.HasAccount is true;
+    var formError  = ViewBag.FormError  as string;
+    var name       = ViewBag.Name       as string ?? "";
+    var inputCls   = "w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-brand";
+    var signInUrl  = "/Auth/Login?returnUrl=" + Uri.EscapeDataString($"/Team/Accept/{token}");
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -25,7 +30,7 @@
     <!-- Logo -->
     <div class="flex items-center justify-center gap-2.5 mb-8">
         <div class="w-10 h-10 brand-logo rounded-xl flex items-center justify-center shadow-lg">
-            <i class="fa-solid fa-address-book text-slate-50"></i>
+            <i class="fa-solid fa-address-book text-white"></i>
         </div>
         <span class="text-xl font-extrabold tracking-tight">
             Candace <span class="brand-text">Holder</span>
@@ -74,20 +79,46 @@
         <div class="p-8">
             <h1 class="text-xl font-bold text-slate-50 mb-2 text-center">You've been invited</h1>
             <p class="text-slate-400 text-sm text-center mb-6">
-                Sign in to join <span class="text-slate-50 font-semibold">@orgName</span>.
+                Join <span class="text-slate-50 font-semibold">@orgName</span>.
                 @if (!string.IsNullOrEmpty(inviteEmail)) {
                     <span class="block mt-1 text-slate-500 text-xs">Invitation sent to @inviteEmail</span>
                 }
             </p>
-            <div class="space-y-3">
-                <a href="/Auth/Login?returnUrl=@Uri.EscapeDataString($"/Team/Accept/{token}")"
-                   class="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-brand hover:bg-brand/90 text-white text-sm font-semibold transition">
-                    <i class="fa-solid fa-right-to-bracket"></i>Sign In to Accept
-                </a>
-                <p class="text-center text-slate-600 text-xs">
-                    Don't have an account? Sign up with Google or Microsoft on the login page.
+
+            @if (hasAccount)
+            {
+                <div class="space-y-3">
+                    <a href="@signInUrl"
+                       class="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-brand hover:bg-brand/90 text-white text-sm font-semibold transition">
+                        <i class="fa-solid fa-right-to-bracket"></i>Sign In to Accept
+                    </a>
+                    <p class="text-center text-slate-500 text-xs">You already have an account — sign in with @inviteEmail.</p>
+                </div>
+            }
+            else
+            {
+                @if (formError != null)
+                {
+                    <div class="mb-4 rounded-xl border border-red-300 bg-red-50 text-red-700 px-4 py-3 text-sm text-center">
+                        <i class="fa-solid fa-circle-exclamation mr-1"></i>@formError
+                    </div>
+                }
+                <form method="post" action="/Team/Accept/@token/Register" class="space-y-3">
+                    @Html.AntiForgeryToken()
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Create your account</p>
+                    <input value="@inviteEmail" disabled class="@inputCls opacity-70" />
+                    <input name="name" value="@name" placeholder="Your name" required class="@inputCls" />
+                    <input name="password" type="password" placeholder="Choose a password (min. 8 characters)" required minlength="8" class="@inputCls" autocomplete="new-password" />
+                    <input name="confirmPassword" type="password" placeholder="Confirm password" required minlength="8" class="@inputCls" autocomplete="new-password" />
+                    <button type="submit"
+                            class="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-brand text-white text-sm font-semibold transition">
+                        <i class="fa-solid fa-user-plus"></i>Create Account &amp; Join
+                    </button>
+                </form>
+                <p class="text-center text-slate-500 text-xs mt-4">
+                    Already have an account? <a href="@signInUrl" class="text-brand font-semibold hover:underline">Sign in instead</a>
                 </p>
-            </div>
+            }
         </div>
 
         }
