@@ -7,6 +7,7 @@ let activeTab     = 'pipeline';   // 'pipeline' | 'closed' | 'archived'
 let selectedIds   = new Set();
 let editingId      = null;
 let editingNotesId = null;
+let viewingContactsId = null;   // lead whose full contact list is expanded
 let canEnrich     = false;   // set from /Leads/Stats — owners/managers only
 
 document.addEventListener('DOMContentLoaded', function() { refreshTabCounts().then(loadLeads); });
@@ -18,6 +19,7 @@ function switchLeadTab(tab) {
     activeFilter = 'all';
     editingId = null;
     editingNotesId = null;
+    viewingContactsId = null;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
 
     document.getElementById('tabPipeline').classList.toggle('lead-tab-active', tab === 'pipeline');
@@ -440,8 +442,11 @@ function buildRow(lead) {
           '</div></td></tr>'
         : '';
 
+    const contactsOpen  = viewingContactsId === lead.id;
     const extraContacts = (lead.contacts || []).length > 1
-        ? '<span class="block text-xs text-slate-500">+' + (lead.contacts.length - 1) + ' more contact' + (lead.contacts.length > 2 ? 's' : '') + '</span>'
+        ? '<button onclick="toggleContacts(' + lead.id + ')" class="block text-xs font-semibold text-brand hover:underline">' +
+          (contactsOpen ? 'Hide contacts' : '+' + (lead.contacts.length - 1) + ' more contact' + (lead.contacts.length > 2 ? 's' : '')) +
+          ' <i class="fa-solid fa-chevron-' + (contactsOpen ? 'up' : 'down') + ' text-[9px]"></i></button>'
         : '';
     const phoneCell = lead.ownerPhone
         ? '<a href="tel:' + escapeAttr(lead.ownerPhone) + '" class="text-green-600 hover:text-green-700 whitespace-nowrap">' + escapeHtml(lead.ownerPhone) + '</a>' +
@@ -461,7 +466,40 @@ function buildRow(lead) {
         '<td class="hidden lg:table-cell">' + emailCell + '</td>' +
         statusCell +
         '<td class="sticky-actions">' + ac + '</td></tr>' +
-        editExpRow + notesExpRow;
+        editExpRow + notesExpRow +
+        (contactsOpen ? '<tr class="notes-row"><td colspan="7" class="notes-row-cell">' + buildContactList(lead) + '</td></tr>' : '');
+}
+
+function toggleContacts(id) {
+    viewingContactsId = viewingContactsId === id ? null : id;
+    renderTable();
+}
+
+// Every contact found for a lead: name, phone (type + DNC/litigator flags), email.
+function buildContactList(lead) {
+    var badge = function (text, title) {
+        return '<span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700" title="' + title + '">' + text + '</span>';
+    };
+    var rows = (lead.contacts || []).map(function (c) {
+        var phone = c.phone
+            ? '<a href="tel:' + escapeAttr(c.phone) + '" class="text-green-600 hover:text-green-700 whitespace-nowrap">' +
+              '<i class="fa-solid ' + (/mobile/i.test(c.phoneType || '') ? 'fa-mobile-screen' : 'fa-phone') + ' text-[10px] mr-1"></i>' +
+              escapeHtml(c.phone) + '</a>' +
+              (c.phoneType ? ' <span class="text-[10px] text-slate-500">' + escapeHtml(c.phoneType) + '</span>' : '') +
+              (c.isDnc ? badge('DNC', 'On a Do Not Call list, do not cold call or text') : '')
+            : '<span class="text-slate-600">—</span>';
+        var email = c.email
+            ? '<a href="mailto:' + escapeAttr(c.email) + '" class="text-indigo-700 hover:underline">' + escapeHtml(c.email) + '</a>'
+            : '<span class="text-slate-600">—</span>';
+        return '<div class="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-3 py-1.5 border-b border-slate-700/60 last:border-0 text-xs">' +
+               '<span class="text-slate-200 font-semibold">' + escapeHtml(c.name || 'Unknown') +
+               (c.isPrimary ? ' <span class="text-[10px] font-semibold text-green-600">Primary</span>' : '') +
+               (c.isLitigator ? badge('LITIGATOR', 'Known TCPA litigator, do not contact') : '') + '</span>' +
+               '<span>' + phone + '</span>' +
+               '<span class="truncate">' + email + '</span></div>';
+    }).join('');
+    return '<div class="pl-1"><p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">' +
+           '<i class="fa-solid fa-users mr-1"></i>All contacts</p>' + rows + '</div>';
 }
 
 // DNC / litigator badge for the lead's main phone (flags come from the skip trace)
@@ -646,6 +684,13 @@ function buildMobileCard(lead) {
         '</div>' +
         '<div class="flex gap-2 mb-3">' + phoneHtml + '</div>' +
         '<div class="flex items-center gap-2">' + actionBtns + '</div>' +
+        ((lead.contacts || []).length > 1
+            ? '<div class="mt-3">' +
+              '<button onclick="toggleContacts(' + lead.id + ')" class="w-full py-2 rounded-xl bg-slate-700/60 border border-slate-600/60 text-xs font-semibold text-brand hover:bg-slate-700 transition">' +
+              '<i class="fa-solid fa-users mr-1.5"></i>' + (viewingContactsId === lead.id ? 'Hide contacts' : 'All ' + lead.contacts.length + ' contacts') + '</button>' +
+              (viewingContactsId === lead.id ? '<div class="mt-2">' + buildContactList(lead) + '</div>' : '') +
+              '</div>'
+            : '') +
         statusRow + notesSection +
         '</div>';
 }
