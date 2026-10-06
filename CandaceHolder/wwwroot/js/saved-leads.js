@@ -2,8 +2,16 @@
 let allLeads      = [];
 let sortCol       = 'savedAt';
 let sortDir       = 'desc';
-let activeTab     = 'untraced';   // 'untraced' | 'traced' | 'closed' | 'archived'
-const TAB_IDS     = { untraced: 'tabUntraced', traced: 'tabTraced', closed: 'tabClosed', archived: 'tabArchived' };
+let activeTab     = 'untraced';   // 'untraced' | 'traced' | 'contacted' | 'closed' | 'archived'
+const TAB_IDS     = { untraced: 'tabUntraced', traced: 'tabTraced', contacted: 'tabContacted', closed: 'tabClosed', archived: 'tabArchived' };
+const TAB_LABELS  = { untraced: 'Not traced', traced: 'Traced', contacted: 'Contacted', closed: 'Closed', archived: 'Archived' };
+
+// Which tab a lead with this status lives in (mirrors LeadsController.Index).
+function tabForStatus(status, isEnriched) {
+    if (status === 'closed_won' || status === 'closed_lost')    return 'closed';
+    if (status === 'contacted' || status === 'appointment_set') return 'contacted';
+    return isEnriched ? 'traced' : 'untraced';
+}
 let selectedIds   = new Set();
 let editingId      = null;
 let editingNotesId = null;
@@ -58,6 +66,7 @@ async function refreshTabCounts() {
         const s = await r.json();
         document.getElementById('tabUntracedCount').textContent = s.untracedCount ?? '';
         document.getElementById('tabTracedCount').textContent   = s.tracedCount   ?? '';
+        document.getElementById('tabContactedCount').textContent = s.contactedCount ?? '';
         document.getElementById('tabClosedCount').textContent   = s.closedCount   ?? '';
         document.getElementById('tabArchivedCount').textContent = s.archivedCount ?? '';
         // Role-gated flag so skip-trace buttons render correctly
@@ -322,12 +331,9 @@ async function setStatus(id, value) {
         });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
-        var closedStatuses = ['closed_won', 'closed_lost'];
-        var lead      = allLeads.find(function (l) { return l.id === id; });
-        var leavesTab = (activeTab !== 'closed' && closedStatuses.includes(value)) ||
-                        (activeTab === 'closed' && !closedStatuses.includes(value));
-        var dest = closedStatuses.includes(value) ? 'Closed' : (lead && lead.isEnriched ? 'Traced' : 'Not traced');
-        showToast(leavesTab ? 'Status updated — moved to ' + dest : 'Status updated', true);
+        var lead = allLeads.find(function (l) { return l.id === id; });
+        var dest = tabForStatus(value, lead && lead.isEnriched);
+        showToast(dest !== activeTab ? 'Status updated — moved to ' + TAB_LABELS[dest] : 'Status updated', true);
         await loadLeads();
         refreshTabCounts();
     } catch(e) {
@@ -729,10 +735,24 @@ function showToast(msg, success) {
 }
 
 // ── Email selected leads (templates from /Email/Templates) ─────────
-var MAX_EMAILS_PER_SEND = 50;   // matches EmailController.MaxPerSend
+var MAX_EMAILS_PER_SEND = 50;   // leads per send — matches EmailController.MaxPerSend
+var MAX_EMAILS_PER_LEAD = 3;    // matches EmailController.MaxEmailsPerLead
+
+// Every address a lead would be emailed at: main email, then emails the skip
+// trace found — de-duplicated and capped (mirrors EmailController.RecipientEmails).
+function leadEmails(lead) {
+    var seen = {}, out = [];
+    [lead.ownerEmail].concat((lead.contacts || []).map(function (c) { return c.email; })).forEach(function (e) {
+        e = (e || '').trim();
+        if (!e || e.indexOf('@') < 1 || seen[e.toLowerCase()] || out.length >= MAX_EMAILS_PER_LEAD) return;
+        seen[e.toLowerCase()] = true;
+        out.push(e);
+    });
+    return out;
+}
 
 function selectedEmailableLeads() {
-    return allLeads.filter(function (l) { return selectedIds.has(l.id) && l.ownerEmail; });
+    return allLeads.filter(function (l) { return selectedIds.has(l.id) && leadEmails(l).length > 0; });
 }
 
 async function openEmailModal() {
@@ -754,15 +774,19 @@ async function openEmailModal() {
     }).join('');
     sel._templates = templates;
 
-    var skipped = selectedIds.size - leads.length;
-    var over    = leads.length > MAX_EMAILS_PER_SEND;
+    var skipped   = selectedIds.size - leads.length;
+    var over      = leads.length > MAX_EMAILS_PER_SEND;
+    var addresses = leads.reduce(function (n, l) { return n + leadEmails(l).length; }, 0);
     document.getElementById('emailCounts').innerHTML =
-        '<b class="text-slate-200">' + leads.length + '</b> selected lead' + (leads.length === 1 ? ' has' : 's have') + ' an email address' +
-        (skipped ? ' (' + skipped + ' without one will be skipped)' : '') + '.' +
-        (over ? ' <span class="text-red-600 font-semibold">Select ' + MAX_EMAILS_PER_SEND + ' or fewer per send.</span>' : '');
+        'Up to <b class="text-slate-200">' + addresses + ' email' + (addresses === 1 ? '' : 's') + '</b> to <b class="text-slate-200">' +
+        leads.length + ' lead' + (leads.length === 1 ? '' : 's') + '</b>: every email the skip trace found, up to ' + MAX_EMAILS_PER_LEAD + ' per lead' +
+        (skipped ? ' (' + skipped + ' lead' + (skipped === 1 ? '' : 's') + ' with no email will be skipped)' : '') + '.' +
+        ' Unsubscribed addresses and anyone who already got this template are skipped.' +
+        (over ? ' <span class="text-red-600 font-semibold">Select ' + MAX_EMAILS_PER_SEND + ' or fewer leads per send.</span>' : '');
     document.getElementById('emailSendBtn').disabled = none || over;
     document.getElementById('emailSendBtn').innerHTML =
-        '<i class="fa-solid fa-paper-plane mr-1.5"></i>Send to ' + Math.min(leads.length, MAX_EMAILS_PER_SEND);
+        '<i class="fa-solid fa-paper-plane mr-1.5"></i>Send ' + addresses + ' email' + (addresses === 1 ? '' : 's');
+    document.getElementById('emailSendBtn')._addresses = addresses;
 
     if (!none) previewEmail();
 }
@@ -797,7 +821,8 @@ async function sendEmails() {
     var leads = selectedEmailableLeads();
     var templateId = parseInt(document.getElementById('emailTemplateSelect').value, 10);
     if (!leads.length || !templateId) return;
-    if (!confirm('Send this email to ' + leads.length + ' lead' + (leads.length === 1 ? '' : 's') + '?')) return;
+    var n = document.getElementById('emailSendBtn')._addresses || leads.length;
+    if (!confirm('Send up to ' + n + ' email' + (n === 1 ? '' : 's') + ' to ' + leads.length + ' lead' + (leads.length === 1 ? '' : 's') + '?')) return;
 
     var btn = document.getElementById('emailSendBtn');
     var orig = btn.innerHTML;
@@ -813,11 +838,13 @@ async function sendEmails() {
         if (!resp.ok) throw new Error(r.error || 'HTTP ' + resp.status);
 
         var notes = [];
-        if (r.skippedDuplicate) notes.push(r.skippedDuplicate + ' already got this template');
+        if (r.skippedDuplicate) notes.push(r.skippedDuplicate + ' address' + (r.skippedDuplicate === 1 ? '' : 'es') + ' already got this template');
         if (r.skippedOptOut)    notes.push(r.skippedOptOut + ' unsubscribed');
         if (r.noEmail)          notes.push(r.noEmail + ' had no valid email');
         if (r.failed && r.failed.length) notes.push(r.failed.length + ' failed');
-        showToast('Sent ' + r.sent + ' email' + (r.sent === 1 ? '' : 's') + (notes.length ? ' (' + notes.join(', ') + ')' : ''),
+        showToast('Sent ' + r.sent + ' email' + (r.sent === 1 ? '' : 's') + ' to ' + r.leads + ' lead' + (r.leads === 1 ? '' : 's') +
+                  (r.leads && activeTab !== 'contacted' ? ' — moved to Contacted' : '') +
+                  (notes.length ? ' (' + notes.join(', ') + ')' : ''),
                   r.sent > 0 && !(r.failed && r.failed.length));
         closeEmailModal();
         clearSelection();

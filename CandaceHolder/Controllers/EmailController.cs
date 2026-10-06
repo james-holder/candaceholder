@@ -23,6 +23,26 @@ namespace CandaceHolder.Controllers
         // sends make a bad template easier to catch before it goes to everyone.
         public const int MaxPerSend = 50;
 
+        // A skip trace often finds several emails for one owner, and none is
+        // scored — so each lead is emailed at every found address, up to this many.
+        public const int MaxEmailsPerLead = 3;
+
+        /// <summary>
+        /// The addresses a lead is emailed at: its main email first, then every
+        /// email the skip trace found — de-duplicated, valid only, capped.
+        /// Pass <paramref name="exclude"/> (opt-outs) so they don't use up a slot.
+        /// </summary>
+        public static List<string> RecipientEmails(Lead lead, ISet<string>? exclude = null) =>
+            new[] { lead.OwnerEmail }
+                .Concat(lead.Contacts.OrderByDescending(c => c.IsPrimary).Select(c => c.Email))
+                .Where(e => !string.IsNullOrWhiteSpace(e))
+                .Select(e => e!.Trim())
+                .Where(e => System.Net.Mail.MailAddress.TryCreate(e, out _))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(e => exclude == null || !exclude.Contains(e))
+                .Take(MaxEmailsPerLead)
+                .ToList();
+
         private readonly AppDbContext          _db;
         private readonly EmailService          _email;
         private readonly IDataProtector        _unsubTokens;
@@ -152,31 +172,42 @@ namespace CandaceHolder.Controllers
             if (template == null) return NotFound(new { error = "Template not found." });
 
             var leads = await _db.Leads
+                .Include(l => l.Contacts)
                 .Where(l => dto.LeadIds.Contains(l.Id) && l.OrgId == orgId && l.DeletedAt == null)
                 .ToListAsync();
 
             var optedOut = (await _db.EmailOptOuts.Where(o => o.OrgId == orgId).Select(o => o.Email).ToListAsync())
                            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // "lead:address" pairs that already got this template.
             var alreadySent = (await _db.EmailSends
                     .Where(s => s.OrgId == orgId && s.TemplateId == template.Id && s.Status == "sent" && dto.LeadIds.Contains(s.LeadId))
-                    .Select(s => s.LeadId).ToListAsync())
+                    .Select(s => new { s.LeadId, s.ToEmail }).ToListAsync())
+                .Select(s => $"{s.LeadId}:{s.ToEmail.ToLowerInvariant()}")
                 .ToHashSet();
 
             int noEmail = 0, skippedOptOut = 0, skippedDuplicate = 0;
             var batch = new List<(Lead Lead, EmailService.OutgoingEmail Email)>();
             foreach (var lead in leads)
             {
-                var to = lead.OwnerEmail?.Trim();
-                if (string.IsNullOrWhiteSpace(to) || !System.Net.Mail.MailAddress.TryCreate(to, out _)) { noEmail++; continue; }
-                if (optedOut.Contains(to))                                  { skippedOptOut++; continue; }
-                if (!dto.AllowRepeat && alreadySent.Contains(lead.Id))       { skippedDuplicate++; continue; }
+                var found     = RecipientEmails(lead);
+                var addresses = RecipientEmails(lead, optedOut);
+                if (found.Count == 0) { noEmail++; continue; }
+                skippedOptOut += lead.Contacts.Select(c => c.Email).Append(lead.OwnerEmail)
+                    .Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => e!.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase).Count(optedOut.Contains);
 
-                var ctx     = ContextFor(lead, org);
-                var subject = TemplateRenderer.Render(template.Subject, ctx);
-                var body    = TemplateRenderer.Render(template.Body, ctx);
-                var unsub   = UnsubscribeUrl(org.Id, to);
-                var (html, text) = WithFooter(body, org, unsub);
-                batch.Add((lead, new EmailService.OutgoingEmail(to, subject, html, text, unsub)));
+                foreach (var to in addresses)
+                {
+                    if (!dto.AllowRepeat && alreadySent.Contains($"{lead.Id}:{to.ToLowerInvariant()}"))   { skippedDuplicate++; continue; }
+
+                    // {{email}} is the address this copy is going to.
+                    var ctx     = ContextFor(lead, org) with { Email = to };
+                    var subject = TemplateRenderer.Render(template.Subject, ctx);
+                    var body    = TemplateRenderer.Render(template.Body, ctx);
+                    var unsub   = UnsubscribeUrl(org.Id, to);
+                    var (html, text) = WithFooter(body, org, unsub);
+                    batch.Add((lead, new EmailService.OutgoingEmail(to, subject, html, text, unsub)));
+                }
             }
 
             var results = await _email.SendManyAsync(batch.Select(b => b.Email).ToList());
@@ -194,15 +225,16 @@ namespace CandaceHolder.Controllers
                 });
                 if (error == null && (lead.Status == "new" || lead.Status == null))
                     lead.Status = "contacted";
-                if (error != null) failures.Add(new { address = lead.Address, error });
+                if (error != null) failures.Add(new { address = lead.Address, to = email.To, error });
             }
             await _db.SaveChangesAsync();
 
-            var sent = results.Count(r => r == null);
-            _logger.LogInformation("Template {TemplateId} sent to {Sent}/{Total} lead(s) by user {UserId}",
-                template.Id, sent, leads.Count, CurrentUserId);
+            var sent      = results.Count(r => r == null);
+            var leadsSent = batch.Where((b, i) => results[i] == null).Select(b => b.Lead.Id).Distinct().Count();
+            _logger.LogInformation("Template {TemplateId}: {Sent} email(s) to {Leads}/{Total} lead(s) by user {UserId}",
+                template.Id, sent, leadsSent, leads.Count, CurrentUserId);
 
-            return Json(new { sent, noEmail, skippedOptOut, skippedDuplicate, failed = failures });
+            return Json(new { sent, leads = leadsSent, noEmail, skippedOptOut, skippedDuplicate, failed = failures });
         }
 
         // ── GET /Email/Unsubscribe/{token} — public ──────────────────
