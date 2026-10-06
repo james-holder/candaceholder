@@ -120,13 +120,13 @@ namespace CandaceHolder.Controllers
             if (!IsAdmin()) return Redirect("/");
 
             var (start, end) = ParseMonth(month);
-            var lines = await BillableTracesAsync(start, end);
-            var rate  = _config.GetValue<decimal?>("Billing:RatePerMatch") ?? 0.07m;
+            var lines  = await BillableTracesAsync(start, end);
+            var totals = await InvoiceTotalsAsync(lines.Count, end);
 
             ViewBag.Month       = start;
             ViewBag.Lines       = lines;
-            ViewBag.Rate        = rate;
-            ViewBag.Total       = Math.Round(lines.Count * rate, 2);
+            ViewBag.Rate        = totals.Rate;
+            ViewBag.Totals      = totals;
             ViewBag.BillTo      = _config["Billing:BillTo"] ?? "";
             ViewBag.BillFrom    = _config["Billing:BillFrom"] ?? "";
             ViewBag.PayNote     = _config["Billing:PaymentInstructions"] ?? "";
@@ -141,18 +141,103 @@ namespace CandaceHolder.Controllers
             if (!IsAdmin()) return Redirect("/");
 
             var (start, end) = ParseMonth(month);
-            var lines = await BillableTracesAsync(start, end);
-            var rate  = _config.GetValue<decimal?>("Billing:RatePerMatch") ?? 0.07m;
+            var lines  = await BillableTracesAsync(start, end);
+            var totals = await InvoiceTotalsAsync(lines.Count, end);
+            var rate   = totals.Rate;
 
             static string Q(string? v) => "\"" + (v ?? "").Replace("\"", "\"\"") + "\"";
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("Date (UTC),Address,Run By,Provider,Amount");
             foreach (var l in lines)
                 sb.AppendLine($"{l.CreatedAt:yyyy-MM-dd HH:mm},{Q(l.Address)},{Q(l.RunBy)},{l.Provider},{rate:0.00##}");
-            sb.AppendLine($",,,Total ({lines.Count} {(lines.Count == 1 ? "match" : "matches")}),{Math.Round(lines.Count * rate, 2):0.00}");
+            sb.AppendLine($",,,Subtotal ({lines.Count} {(lines.Count == 1 ? "match" : "matches")}),{totals.Subtotal:0.00}");
+            foreach (var extra in totals.Extras)
+                sb.AppendLine($",,,{Q($"{extra.Label} ({extra.Percent:0.##}%)")},{extra.Amount:0.00}");
+            sb.AppendLine($",,,Total,{totals.Total:0.00}");
 
             return File(System.Text.Encoding.UTF8.GetBytes(sb.ToString()), "text/csv",
                         $"skip-trace-usage-{start:yyyy-MM}.csv");
+        }
+
+        // Invoice math. BatchData charges sales tax and a card fee when the wallet
+        // is topped up, not per lookup — so the true cost of a 7¢ match is 7¢ plus
+        // those percentages. They're computed from the actual paid top-ups up to
+        // the end of the invoice month (Billing:OverheadPercent overrides with a
+        // single combined percentage).
+        private async Task<InvoiceTotals> InvoiceTotalsAsync(int matches, DateTime monthEnd)
+        {
+            var rate     = _config.GetValue<decimal?>("Billing:RatePerMatch") ?? 0.07m;
+            var subtotal = Math.Round(matches * rate, 2);
+            var totals   = new InvoiceTotals { Rate = rate, Subtotal = subtotal };
+
+            void Add(string label, decimal fraction)
+            {
+                if (fraction <= 0) return;
+                totals.Extras.Add(new InvoiceExtra
+                {
+                    Label   = label,
+                    Percent = Math.Round(fraction * 100, 2),
+                    Amount  = Math.Round(subtotal * fraction, 2)
+                });
+            }
+
+            var overridePct = _config.GetValue<decimal?>("Billing:OverheadPercent");
+            if (overridePct != null)
+            {
+                Add("Sales tax & card fees paid to BatchData", overridePct.Value / 100m);
+                totals.Source = "From the Billing:OverheadPercent setting.";
+            }
+            else
+            {
+                var key = _config["BatchData:WalletApiKey"];
+                if (string.IsNullOrWhiteSpace(key)) key = _config["BatchData:ApiKey"];
+
+                if (string.IsNullOrWhiteSpace(key))
+                    totals.Warning = "No BatchData key — tax and card fees aren't included.";
+                else
+                {
+                    var lastDay = monthEnd.AddDays(-1);
+                    var (topups, error) = await _cache.GetOrCreateAsync($"batchdata-topups:{lastDay:yyyy-MM-dd}", async entry =>
+                    {
+                        var r = await _realData.GetBatchDataTopupsAsync(key, lastDay);
+                        entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(r.Topups != null ? 10 : 0.25);
+                        return r;
+                    });
+
+                    var credits = topups?.Sum(t => t.Credits) ?? 0;
+                    if (topups == null)
+                        totals.Warning = $"{error} Tax and card fees aren't included.";
+                    else if (credits <= 0)
+                        totals.Warning = "No paid BatchData top-ups found yet — tax and card fees aren't included.";
+                    else
+                    {
+                        Add("Sales tax paid to BatchData", topups.Sum(t => t.SalesTax) / credits);
+                        Add("Card processing fees paid to BatchData", topups.Sum(t => t.CardFee) / credits);
+                        totals.Source = $"Based on {topups.Count} BatchData top-up{(topups.Count == 1 ? "" : "s")} " +
+                                        $"totaling {credits:C2} (through {lastDay:MMM d, yyyy}).";
+                    }
+                }
+            }
+
+            totals.Total = subtotal + totals.Extras.Sum(e => e.Amount);
+            return totals;
+        }
+
+        public class InvoiceTotals
+        {
+            public decimal            Rate     { get; set; }
+            public decimal            Subtotal { get; set; }
+            public List<InvoiceExtra> Extras   { get; } = new();
+            public decimal            Total    { get; set; }
+            public string?            Source   { get; set; }   // how the percentages were worked out
+            public string?            Warning  { get; set; }   // why they couldn't be
+        }
+
+        public class InvoiceExtra
+        {
+            public string  Label   { get; set; } = "";
+            public decimal Percent { get; set; }
+            public decimal Amount  { get; set; }
         }
 
         // "2026-10" → [Oct 1, Nov 1) in UTC; blank/invalid → current month.

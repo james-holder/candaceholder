@@ -607,6 +607,76 @@ out center;";
             }
         }
 
+        // ─────────────────────────────────────────────────────────────────
+        // BatchData wallet top-ups — free to call. Sales tax and card fees are
+        // charged when money is added to the wallet, not per lookup, so this is
+        // where the real overhead on each 7¢ match comes from.
+        //   GET https://api.batchdata.com/api/v1/wallet/credit-card-transactions
+        //   Needs the wallet-credit-card-transactions permission.
+        //   Docs: https://developer.batchdata.com/docs/batchdata/batchdata-v1/operations/list-wallet-credit-card-transactions
+        // ─────────────────────────────────────────────────────────────────
+        public record WalletTopup(decimal Credits, decimal SalesTax, decimal CardFee, DateTimeOffset? CreatedAt);
+
+        /// <summary>
+        /// Paid top-ups up to and including <paramref name="endDate"/>, or null with
+        /// an error message if the request failed.
+        /// </summary>
+        public async Task<(List<WalletTopup>? Topups, string? Error)> GetBatchDataTopupsAsync(string apiKey, DateTime endDate)
+        {
+            var all = new List<WalletTopup>();
+            try
+            {
+                using var client = _httpFactory.CreateClient("batchdata");
+                for (int page = 1; page <= 20; page++)   // 2,000 top-ups is far more than enough
+                {
+                    var url = "https://api.batchdata.com/api/v1/wallet/credit-card-transactions" +
+                              $"?status=1&per_page=100&page={page}&end_date={endDate:yyyy-MM-dd}";
+                    using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+                    request.Headers.Accept.ParseAdd("application/json");
+
+                    var resp = await client.SendAsync(request);
+                    var body = await resp.Content.ReadAsStringAsync();
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        _logger.LogWarning("BatchData top-ups returned {Status}: {Body}",
+                            (int)resp.StatusCode, body.Length > 300 ? body[..300] : body);
+                        return (null, (int)resp.StatusCode == 403
+                            ? "The BatchData token doesn't have the wallet-credit-card-transactions permission."
+                            : $"BatchData returned HTTP {(int)resp.StatusCode} for top-ups.");
+                    }
+
+                    using var doc = JsonDocument.Parse(body);
+                    var results = doc.RootElement.GetProperty("results");
+                    foreach (var t in results.GetProperty("data").EnumerateArray())
+                    {
+                        all.Add(new WalletTopup(
+                            Credits:  GetDecimal(t, "credits"),
+                            SalesTax: GetDecimal(t, "sales_tax_charge"),
+                            CardFee:  GetDecimal(t, "card_processing_fee"),
+                            CreatedAt: t.TryGetProperty("created_at", out var c) && DateTimeOffset.TryParse(c.GetString(), out var d) ? d : null));
+                    }
+
+                    var lastPage = results.TryGetProperty("meta", out var meta) && meta.TryGetProperty("last_page", out var lp)
+                                   ? lp.GetInt32() : page;
+                    if (page >= lastPage) break;
+                }
+                return (all, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "BatchData top-ups call failed");
+                return (null, "Couldn't reach BatchData for top-ups.");
+            }
+        }
+
+        // Number or numeric string → decimal; anything else → 0.
+        private static decimal GetDecimal(JsonElement el, string prop) =>
+            !el.TryGetProperty(prop, out var v) ? 0m
+            : v.ValueKind == JsonValueKind.Number ? v.GetDecimal()
+            : decimal.TryParse(v.GetString(), System.Globalization.NumberStyles.Any,
+                               System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0m;
+
         // "2145551234" → "(214) 555-1234"; anything else is returned as-is.
         private static string FormatPhone(string raw)
         {
