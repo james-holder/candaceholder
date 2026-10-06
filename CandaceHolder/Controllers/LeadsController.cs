@@ -77,13 +77,15 @@ namespace CandaceHolder.Controllers
             return View(lead);
         }
 
-        // ── GET /Leads?tab=pipeline|closed|archived ──────────────────
+        // ── GET /Leads?tab=untraced|traced|closed|archived ───────────
+        // untraced / traced split the open (not closed, not archived) leads by
+        // whether they've been skip traced; "pipeline" = both together.
         [HttpGet]
-        public async Task<IActionResult> Index(string tab = "pipeline")
+        public async Task<IActionResult> Index(string tab = "untraced")
         {
             var orgId = CurrentOrgId;
 
-            // Pipeline = everything active and not yet closed, including brand-new leads.
+            // Open = everything active and not yet closed, including brand-new leads.
             var pipelineStatuses = new[] { "new", "contacted", "appointment_set" };
             var closedStatuses   = new[] { "closed_won", "closed_lost" };
 
@@ -99,9 +101,11 @@ namespace CandaceHolder.Controllers
                     .Where(l => (l.OrgId == orgId || l.OrgId == null) && l.DeletedAt == null);
                 query = tab switch
                 {
-                    "closed"   => query.Where(l => closedStatuses.Contains(l.Status)),
-                    _          => query.Where(l => l.Status == null || pipelineStatuses.Contains(l.Status))  // pipeline (default)
+                    "closed" => query.Where(l => closedStatuses.Contains(l.Status)),
+                    _        => query.Where(l => l.Status == null || pipelineStatuses.Contains(l.Status))
                 };
+                if (tab == "untraced") query = query.Where(l => !l.IsEnriched);
+                if (tab == "traced")   query = query.Where(l => l.IsEnriched);
             }
 
             var leads = await query
@@ -331,6 +335,7 @@ namespace CandaceHolder.Controllers
 
             var allLeadsQ    = _db.Leads.Where(l => l.OrgId == orgId || l.OrgId == null);
             var activeLeadsQ = allLeadsQ.Where(l => l.DeletedAt == null);
+            var openLeadsQ   = activeLeadsQ.Where(l => l.Status == null || new[] { "new", "contacted", "appointment_set" }.Contains(l.Status));
             var enrichmentsQ = _db.Enrichments.Where(e => e.UserId == userId);
 
             return Json(new
@@ -338,7 +343,9 @@ namespace CandaceHolder.Controllers
                 totalLeads              = await activeLeadsQ.CountAsync(),
                 leadsThisMonth          = await activeLeadsQ.CountAsync(l => l.SavedAt >= som),
                 unenrichedCount         = await activeLeadsQ.CountAsync(l => l.Status == "new" || l.Status == null),
-                pipelineCount           = await activeLeadsQ.CountAsync(l => l.Status == null || new[] { "new", "contacted", "appointment_set" }.Contains(l.Status)),
+                pipelineCount           = await openLeadsQ.CountAsync(),
+                untracedCount           = await openLeadsQ.CountAsync(l => !l.IsEnriched),
+                tracedCount             = await openLeadsQ.CountAsync(l => l.IsEnriched),
                 closedCount             = await activeLeadsQ.CountAsync(l => new[] { "closed_won", "closed_lost" }.Contains(l.Status)),
                 archivedCount           = await allLeadsQ.CountAsync(l => l.DeletedAt != null),
                 totalEnrichments        = await enrichmentsQ.CountAsync(),

@@ -2,8 +2,8 @@
 let allLeads      = [];
 let sortCol       = 'savedAt';
 let sortDir       = 'desc';
-let activeFilter  = 'all';        // 'all' | 'untraced' | 'traced'
-let activeTab     = 'pipeline';   // 'pipeline' | 'closed' | 'archived'
+let activeTab     = 'untraced';   // 'untraced' | 'traced' | 'closed' | 'archived'
+const TAB_IDS     = { untraced: 'tabUntraced', traced: 'tabTraced', closed: 'tabClosed', archived: 'tabArchived' };
 let selectedIds   = new Set();
 let editingId      = null;
 let editingNotesId = null;
@@ -16,15 +16,13 @@ document.addEventListener('DOMContentLoaded', function() { refreshTabCounts().th
 function switchLeadTab(tab) {
     activeTab = tab;
     selectedIds.clear();
-    activeFilter = 'all';
     editingId = null;
     editingNotesId = null;
     viewingContactsId = null;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === 'all'));
 
-    document.getElementById('tabPipeline').classList.toggle('lead-tab-active', tab === 'pipeline');
-    document.getElementById('tabClosed').classList.toggle('lead-tab-active',   tab === 'closed');
-    document.getElementById('tabArchived').classList.toggle('lead-tab-active', tab === 'archived');
+    Object.keys(TAB_IDS).forEach(function (t) {
+        document.getElementById(TAB_IDS[t]).classList.toggle('lead-tab-active', t === tab);
+    });
 
     // Checkboxes and the bulk toolbar don't apply to archived leads
     document.getElementById('bulkToolbar').classList.add('hidden');
@@ -58,7 +56,8 @@ async function refreshTabCounts() {
         const r = await fetch('/Leads/Stats');
         if (!r.ok) return;
         const s = await r.json();
-        document.getElementById('tabPipelineCount').textContent = s.pipelineCount ?? '';
+        document.getElementById('tabUntracedCount').textContent = s.untracedCount ?? '';
+        document.getElementById('tabTracedCount').textContent   = s.tracedCount   ?? '';
         document.getElementById('tabClosedCount').textContent   = s.closedCount   ?? '';
         document.getElementById('tabArchivedCount').textContent = s.archivedCount ?? '';
         // Role-gated flag so skip-trace buttons render correctly
@@ -67,24 +66,10 @@ async function refreshTabCounts() {
 }
 
 function updateTabCounts() {
-    var counts = { pipeline: 'tabPipelineCount', closed: 'tabClosedCount', archived: 'tabArchivedCount' };
-    var el = document.getElementById(counts[activeTab]);
+    var el = document.getElementById(TAB_IDS[activeTab] + 'Count');
     if (el) el.textContent = allLeads.length;
     var hero = document.getElementById('heroCount');
     if (hero) hero.textContent = allLeads.length ? '(' + allLeads.length + ')' : '';
-}
-
-// ── Filter bar ────────────────────────────────────────────────────
-function setFilter(f) {
-    activeFilter = f;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
-    renderTable();
-}
-
-function matchesFilter(lead) {
-    if (activeFilter === 'traced')   return lead.isEnriched;
-    if (activeFilter === 'untraced') return !lead.isEnriched;
-    return true;
 }
 
 // ── Sort ──────────────────────────────────────────────────────────
@@ -202,6 +187,7 @@ async function bulkEnrich() {
         selectedIds.clear();
         updateBulkToolbar();
         await loadLeads();
+        refreshTabCounts();
     } catch (e) {
         showToast('Skip trace failed: ' + e.message, false);
     } finally {
@@ -255,7 +241,6 @@ function renderTable() {
     setLoading(false);
     const query = (document.getElementById('searchInput').value || '').toLowerCase();
     let rows = allLeads
-        .filter(matchesFilter)
         .filter(l => !query || [l.address, l.ownerName, l.ownerPhone, l.ownerEmail].some(v => (v||'').toLowerCase().includes(query)));
 
     rows = rows.sort((a, b) => {
@@ -264,9 +249,6 @@ function renderTable() {
         return sortDir === 'asc' ? cmp : -cmp;
     });
 
-    document.getElementById('fAll').textContent      = allLeads.length;
-    document.getElementById('fUntraced').textContent = allLeads.filter(l => !l.isEnriched).length;
-    document.getElementById('fTraced').textContent   = allLeads.filter(l => l.isEnriched).length;
 
     const body    = document.getElementById('leadsBody');
     const cards   = document.getElementById('mobileCards');
@@ -335,9 +317,10 @@ async function setStatus(id, value) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
 
         var closedStatuses = ['closed_won', 'closed_lost'];
-        var leavesTab = (activeTab === 'pipeline' && closedStatuses.includes(value)) ||
-                        (activeTab === 'closed'   && !closedStatuses.includes(value));
-        var dest = closedStatuses.includes(value) ? 'Closed' : 'Active';
+        var lead      = allLeads.find(function (l) { return l.id === id; });
+        var leavesTab = (activeTab !== 'closed' && closedStatuses.includes(value)) ||
+                        (activeTab === 'closed' && !closedStatuses.includes(value));
+        var dest = closedStatuses.includes(value) ? 'Closed' : (lead && lead.isEnriched ? 'Traced' : 'Not traced');
         showToast(leavesTab ? 'Status updated — moved to ' + dest : 'Status updated', true);
         await loadLeads();
         refreshTabCounts();
@@ -555,11 +538,12 @@ async function enrichLead(id, btn) {
 
         if (r.status === 'completed') {
             var found = [r.ownerName, r.ownerPhone, r.ownerEmail].filter(Boolean).join(' · ');
-            showToast(found ? 'Found: ' + found : 'Traced — no contact details found', !!found);
+            showToast(found ? 'Found: ' + found + ' — moved to Traced' : 'Traced — no contact details found', !!found);
         } else {
-            showToast('No data found for this address', false);
+            showToast('No data found for this address — moved to Traced', false);
         }
         await loadLeads();
+        refreshTabCounts();
     } catch (e) {
         showToast('Skip trace failed: ' + e.message, false);
         btn.disabled = false; btn.innerHTML = origHtml;

@@ -119,11 +119,17 @@
 ══════════════════════════════════════════════════════════════ -->
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 pb-1 overflow-x-auto">
     <div class="inline-flex min-w-full sm:min-w-0 rounded-xl bg-slate-800 border border-slate-700 p-1 gap-1">
-        <button id="tabPipeline" onclick="switchLeadTab('pipeline')"
+        <button id="tabUntraced" onclick="switchLeadTab('untraced')"
             class="lead-tab lead-tab-active flex-1 flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap">
-            <i class="fa-solid fa-filter text-sky-600"></i>
-            Active
-            <span id="tabPipelineCount" class="px-2 py-0.5 rounded-full bg-slate-700/80 text-xs font-bold text-slate-300"></span>
+            <i class="fa-solid fa-hourglass-half text-orange-500"></i>
+            Not traced
+            <span id="tabUntracedCount" class="px-2 py-0.5 rounded-full bg-slate-700/80 text-xs font-bold text-slate-300"></span>
+        </button>
+        <button id="tabTraced" onclick="switchLeadTab('traced')"
+            class="lead-tab flex-1 flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap">
+            <i class="fa-solid fa-circle-check text-teal-600"></i>
+            Traced
+            <span id="tabTracedCount" class="px-2 py-0.5 rounded-full bg-slate-700/80 text-xs font-bold text-slate-300"></span>
         </button>
         <button id="tabClosed" onclick="switchLeadTab('closed')"
             class="lead-tab flex-1 flex items-center justify-center gap-1.5 px-3 sm:px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap">
@@ -174,22 +180,6 @@
 
     <!-- Filter / search bar -->
     <div class="mb-4 space-y-2 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
-
-        <!-- Skip-trace filter pills — scroll horizontally on mobile -->
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5" style="-ms-overflow-style:none;scrollbar-width:none;">
-            <button onclick="setFilter('all')" data-f="all"
-                class="filter-btn active flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 border border-slate-600">
-                All <span id="fAll" class="ml-1 opacity-60"></span>
-            </button>
-            <button onclick="setFilter('untraced')" data-f="untraced"
-                class="filter-btn flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 border border-slate-600">
-                <span class="text-orange-600">● Not traced</span> <span id="fUntraced" class="ml-1 opacity-60"></span>
-            </button>
-            <button onclick="setFilter('traced')" data-f="traced"
-                class="filter-btn flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 border border-slate-600">
-                <span class="text-green-600">● Traced</span> <span id="fTraced" class="ml-1 opacity-60"></span>
-            </button>
-        </div>
 
         <!-- Search — full width on mobile -->
         <div class="relative sm:flex-1 sm:min-w-[200px] sm:max-w-sm sm:ml-auto">
