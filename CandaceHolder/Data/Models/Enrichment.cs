@@ -8,7 +8,8 @@ namespace CandaceHolder.Data.Models
         public string?  Address      { get; set; }
         public string   Status       { get; set; } = "pending";
         public string   Provider     { get; set; } = "batchskiptracing";
-        public int      CreditsUsed  { get; set; } = 1;
+        /// <summary>1 if the paid provider matched (a billed lookup), else 0.</summary>
+        public int      CreditsUsed  { get; set; }
         public DateTime CreatedAt    { get; set; } = DateTime.UtcNow;
 
         public User? User { get; set; }

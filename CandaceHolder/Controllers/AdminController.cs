@@ -12,11 +12,13 @@ namespace CandaceHolder.Controllers
         private readonly AppDbContext        _db;
         private readonly EmailService        _email;
         private readonly string              _adminEmail;
+        private readonly IConfiguration      _config;
 
         public AdminController(AppDbContext db, EmailService email, IConfiguration config)
         {
             _db         = db;
             _email      = email;
+            _config     = config;
             _adminEmail = config["AdminEmail"] ?? "";
         }
 
@@ -77,6 +79,87 @@ namespace CandaceHolder.Controllers
             ViewBag.Users = users;
 
             return View();
+        }
+
+        // ── GET /Admin/Invoice?month=2026-10 ──────────────────────────
+        // Monthly usage invoice: every skip trace the paid provider matched
+        // in the month × Billing:RatePerMatch. For reimbursing whoever pays
+        // the BatchData bill — printable, plus a CSV of every line.
+        [HttpGet("Invoice")]
+        public async Task<IActionResult> Invoice(string? month = null)
+        {
+            if (!IsAdmin()) return Redirect("/");
+
+            var (start, end) = ParseMonth(month);
+            var lines = await BillableTracesAsync(start, end);
+            var rate  = _config.GetValue<decimal?>("Billing:RatePerMatch") ?? 0.07m;
+
+            ViewBag.Month       = start;
+            ViewBag.Lines       = lines;
+            ViewBag.Rate        = rate;
+            ViewBag.Total       = Math.Round(lines.Count * rate, 2);
+            ViewBag.BillTo      = _config["Billing:BillTo"] ?? "";
+            ViewBag.BillFrom    = _config["Billing:BillFrom"] ?? "";
+            ViewBag.PayNote     = _config["Billing:PaymentInstructions"] ?? "";
+            ViewBag.InvoiceNo   = $"CH-{start:yyyy-MM}";
+            return View();
+        }
+
+        // ── GET /Admin/Invoice/Csv?month=2026-10 ──────────────────────
+        [HttpGet("Invoice/Csv")]
+        public async Task<IActionResult> InvoiceCsv(string? month = null)
+        {
+            if (!IsAdmin()) return Redirect("/");
+
+            var (start, end) = ParseMonth(month);
+            var lines = await BillableTracesAsync(start, end);
+            var rate  = _config.GetValue<decimal?>("Billing:RatePerMatch") ?? 0.07m;
+
+            static string Q(string? v) => "\"" + (v ?? "").Replace("\"", "\"\"") + "\"";
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Date (UTC),Address,Run By,Provider,Amount");
+            foreach (var l in lines)
+                sb.AppendLine($"{l.CreatedAt:yyyy-MM-dd HH:mm},{Q(l.Address)},{Q(l.RunBy)},{l.Provider},{rate:0.00##}");
+            sb.AppendLine($",,,Total ({lines.Count} {(lines.Count == 1 ? "match" : "matches")}),{Math.Round(lines.Count * rate, 2):0.00}");
+
+            return File(System.Text.Encoding.UTF8.GetBytes(sb.ToString()), "text/csv",
+                        $"skip-trace-usage-{start:yyyy-MM}.csv");
+        }
+
+        // "2026-10" → [Oct 1, Nov 1) in UTC; blank/invalid → current month.
+        private static (DateTime Start, DateTime End) ParseMonth(string? month)
+        {
+            var now = DateTime.UtcNow;
+            var start = DateTime.TryParseExact(month + "-01", "yyyy-MM-dd",
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                            out var parsed)
+                ? parsed
+                : new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            return (start, start.AddMonths(1));
+        }
+
+        private Task<List<InvoiceLine>> BillableTracesAsync(DateTime start, DateTime end) =>
+            _db.Enrichments.AsNoTracking()
+               .Where(e => e.CreatedAt >= start && e.CreatedAt < end &&
+                           e.CreditsUsed > 0 &&
+                           (e.Provider == "batchdata" || e.Provider == "whitepages"))
+               .OrderBy(e => e.CreatedAt)
+               .Select(e => new InvoiceLine
+               {
+                   CreatedAt = e.CreatedAt,
+                   Address   = e.Address ?? "",
+                   RunBy     = e.User != null ? (e.User.DisplayName ?? e.User.Email ?? "") : "",
+                   Provider  = e.Provider
+               })
+               .ToListAsync();
+
+        public class InvoiceLine
+        {
+            public DateTime CreatedAt { get; set; }
+            public string   Address   { get; set; } = "";
+            public string   RunBy     { get; set; } = "";
+            public string   Provider  { get; set; } = "";
         }
 
         // ── POST /Admin/Users/{id}/Role ────────────────────────────────

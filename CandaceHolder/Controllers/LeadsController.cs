@@ -374,6 +374,9 @@ namespace CandaceHolder.Controllers
             var bdKey    = _config["BatchData:ApiKey"];
             var wpKey    = _config["WhitepagesPro:ApiKey"];
             var outcome  = leads.ToDictionary(l => l.Id, _ => "not_found");
+            // Leads the paid provider (BatchData / Whitepages) actually matched —
+            // the ones it bills for, and so the ones on the monthly usage invoice.
+            var billable = new HashSet<long>();
             var provider = !string.IsNullOrWhiteSpace(bdKey) ? "batchdata"
                          : !string.IsNullOrWhiteSpace(wpKey) ? "whitepages"
                          : "regrid";
@@ -423,6 +426,7 @@ namespace CandaceHolder.Controllers
 
                         ReplaceContacts(lead, r.OwnerName, contacts, "batchdata");
                         outcome[lead.Id] = "completed";
+                        billable.Add(lead.Id);
                     }
                 }
             }
@@ -439,6 +443,7 @@ namespace CandaceHolder.Controllers
                     }).ToList();
                     ReplaceContacts(lead, found[0].OwnerName, contacts, "whitepages");
                     outcome[lead.Id] = "completed";
+                    billable.Add(lead.Id);
                 }
             }
 
@@ -455,7 +460,7 @@ namespace CandaceHolder.Controllers
                     Address     = lead.Address,
                     Status      = outcome[lead.Id],
                     Provider    = provider,
-                    CreditsUsed = outcome[lead.Id] == "completed" ? 1 : 0,
+                    CreditsUsed = billable.Contains(lead.Id) ? 1 : 0,   // 1 = billed match (see Admin → Usage invoice)
                     CreatedAt   = DateTime.UtcNow
                 });
             }

@@ -177,7 +177,10 @@ namespace CandaceHolder.Data
                 e.Property(en => en.Address).HasColumnName("address");
                 e.Property(en => en.Status).HasColumnName("status").HasDefaultValue("pending");
                 e.Property(en => en.Provider).HasColumnName("provider").HasDefaultValue("batchskiptracing");
-                e.Property(en => en.CreditsUsed).HasColumnName("credits_used").HasDefaultValue(1);
+                // No HasDefaultValue here: EF would then skip writing 0 (the CLR
+                // default) and the column's DB default would turn a no-match into a
+                // billed match. CreditsUsed is always set explicitly.
+                e.Property(en => en.CreditsUsed).HasColumnName("credits_used");
                 e.Property(en => en.CreatedAt).HasColumnName("created_at")
                  .HasDefaultValueSql("datetime('now')");
 
