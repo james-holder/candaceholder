@@ -46,32 +46,41 @@ namespace CandaceHolder.Services
 );
 out center;";
 
-            try
+            // The public Overpass servers are free but often busy (504 Gateway
+            // Timeout), so fall through to a mirror before giving up.
+            foreach (var endpoint in OverpassEndpoints)
             {
-                using var client  = _httpFactory.CreateClient("overpass");
-                var       content = new FormUrlEncodedContent(new[]
+                try
                 {
-                    new KeyValuePair<string, string>("data", query)
-                });
+                    using var client  = _httpFactory.CreateClient("overpass");
+                    using var content = new FormUrlEncodedContent(new[]
+                    {
+                        new KeyValuePair<string, string>("data", query)
+                    });
 
-                var resp = await client.PostAsync(
-                    "https://overpass-api.de/api/interpreter", content);
+                    var resp = await client.PostAsync(endpoint, content);
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        _logger.LogWarning("Overpass {Endpoint} returned {Status}", endpoint, resp.StatusCode);
+                        continue;
+                    }
 
-                if (!resp.IsSuccessStatusCode)
-                {
-                    _logger.LogWarning("Overpass API returned {Status}", resp.StatusCode);
-                    return new List<OsmAddress>();
+                    var json = await resp.Content.ReadAsStringAsync();
+                    return ParseOverpassAddresses(json);
                 }
-
-                var json = await resp.Content.ReadAsStringAsync();
-                return ParseOverpassAddresses(json);
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Overpass {Endpoint} call failed", endpoint);
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Overpass API call failed");
-                return new List<OsmAddress>();
-            }
+            return new List<OsmAddress>();
         }
+
+        private static readonly string[] OverpassEndpoints =
+        {
+            "https://overpass-api.de/api/interpreter",
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter",   // public mirror
+        };
 
         private static List<OsmAddress> ParseOverpassAddresses(string json)
         {

@@ -13,12 +13,28 @@
 
     // Idempotent — builds the map once, the first time the tab is opened.
     window.initAreaMap = function (lat, lng) {
+        // Start at the top: the page may be scrolled down from search results,
+        // which would leave the toolbar hidden under the sticky header.
+        window.scrollTo(0, 0);
+
         if (areaMap) {
             areaMap.invalidateSize();
             return;
         }
         areaMap = L.map('areaMap', { center: [lat, lng], zoom: 14, zoomControl: true });
         addBasemapWithToggle(areaMap);
+
+        // On-map "Select Area" button, so it's always visible next to the map.
+        var ctrl = L.control({ position: 'topleft' });
+        ctrl.onAdd = function () {
+            var div = L.DomUtil.create('div');
+            div.innerHTML = '<button type="button" id="mapAreaSelectBtn" class="map-area-btn">' +
+                            '<i class="fa-solid fa-draw-polygon"></i>&nbsp;Select Area</button>';
+            L.DomEvent.disableClickPropagation(div);
+            div.querySelector('button').addEventListener('click', window.toggleAreaSelect);
+            return div;
+        };
+        ctrl.addTo(areaMap);
 
         areaMap.on('mousedown', onMouseDown);
         areaMap.on('mousemove', onMouseMove);
@@ -48,6 +64,14 @@
         btn.classList.toggle('bg-brand/20',      selectMode);
         btn.classList.toggle('border-slate-600', !selectMode);
         btn.classList.toggle('bg-slate-900',     !selectMode);
+
+        var mapBtn = document.getElementById('mapAreaSelectBtn');
+        if (mapBtn) {
+            mapBtn.classList.toggle('armed', selectMode);
+            mapBtn.innerHTML = selectMode
+                ? '<i class="fa-solid fa-hand-pointer"></i>&nbsp;Drag a box… (click to cancel)'
+                : '<i class="fa-solid fa-draw-polygon"></i>&nbsp;Select Area';
+        }
 
         areaMap.dragging[selectMode ? 'disable' : 'enable']();
         areaMap.getContainer().style.cursor = selectMode ? 'crosshair' : '';

@@ -123,12 +123,14 @@
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
                 { attribution: 'Labels &copy; Esri', maxZoom: 19 })
         ]);
+        // Street map: MapTiler if a key is configured, otherwise Esri's World
+        // Street Map (no key needed — CARTO's free tiles now require a key).
         const mtKey  = window.MAPTILER_KEY || '';
         const street = mtKey
-            ? L.tileLayer('https://api.maptiler.com/maps/streets-v2-dark/{z}/{x}/{y}.png?key=' + mtKey,
+            ? L.tileLayer('https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=' + mtKey,
                 { attribution: '&copy; MapTiler &copy; OpenStreetMap contributors', maxZoom: 20, tileSize: 512, zoomOffset: -1 })
-            : L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-                { attribution: '&copy; OpenStreetMap contributors &copy; CARTO', maxZoom: 19 });
+            : L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+                { attribution: 'Tiles &copy; Esri', maxZoom: 19 });
         satellite.addTo(map);
 
         let isSatellite = true;

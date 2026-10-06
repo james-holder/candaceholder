@@ -115,6 +115,24 @@ header.sticky::after {
 /* ── Focus rings ─────────────────────────────────────────────── */
 input:focus, select:focus, textarea:focus { --tw-ring-color: rgba(225,29,116,0.45) !important; }
 
+/* ── On-map "Select Area" button (area-map.js) ───────────────── */
+.map-area-btn {
+    margin-top: 6px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: 0;
+    font: 700 12px 'Nunito', ui-sans-serif, system-ui, sans-serif;
+    color: #fff;
+    cursor: pointer;
+    background: linear-gradient(135deg, #e11d74, #f97316);
+    box-shadow: 0 4px 12px rgba(225,29,116,0.4);
+}
+.map-area-btn:hover { filter: brightness(1.06); }
+.map-area-btn.armed {
+    background: #0d9488;
+    box-shadow: 0 0 0 3px rgba(45,212,191,0.45), 0 4px 12px rgba(13,148,136,0.4);
+}
+
 /* ── Leaflet map controls / popups on the light theme ────────── */
 .leaflet-container { font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif; }
 
