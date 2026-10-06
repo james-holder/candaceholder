@@ -24,7 +24,7 @@
 
     <!-- Google Maps Places — define callback BEFORE async script loads -->
     <script src="~/js/home-index-autocomplete.js" asp-append-version="true"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=@ViewBag.GoogleMapsApiKey&libraries=places&callback=initAutocomplete" async></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=@ViewBag.GoogleMapsApiKey&libraries=places&loading=async&callback=initAutocomplete" async></script>
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body class="min-h-screen">

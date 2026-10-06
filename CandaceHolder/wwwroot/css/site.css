@@ -76,8 +76,31 @@ body {
 /* ── Home page: map ─────────────────────────────────────── */
 #map { height: 520px; border-radius: 12px; }
 
-/* ── Home page: Google autocomplete dropdown z-index fix ── */
-.pac-container { z-index: 9999 !important; }
+/* ── Home page: address suggestions dropdown (home-index-autocomplete.js) ── */
+.address-suggestions {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 60;
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    overflow: hidden;
+}
+.address-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #cbd5e1;
+    cursor: pointer;
+}
+.address-suggestion i { color: #64748b; font-size: 11px; }
+.address-suggestion:hover,
+.address-suggestion.active { background: #334155; color: #fff; }
 
 /* ── Home page: hero gradient ────────────────────────────── */
 .hero-gradient {

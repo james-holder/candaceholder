@@ -42,17 +42,9 @@
         setLoading(true);
 
         try {
-            // Use coords from autocomplete pick; fall back to client-side geocoder
-            let lat = _pickedLat, lng = _pickedLng;
-            if (!lat || !lng) {
-                const geo = await clientGeocode(address);
-                if (!geo) {
-                    showError('Could not locate that address. Try selecting a suggestion from the dropdown.');
-                    return;
-                }
-                lat = geo.lat;
-                lng = geo.lng;
-            }
+            // Use coords from a picked suggestion; otherwise send 0,0 and the
+            // server geocodes the typed address itself.
+            const lat = _pickedLat || 0, lng = _pickedLng || 0;
 
             const url = scanMode === 'single'
                 ? `/Properties/SingleAddress?address=${encodeURIComponent(address)}&lat=${lat}&lng=${lng}`
