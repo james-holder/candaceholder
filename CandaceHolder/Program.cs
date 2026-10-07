@@ -182,6 +182,8 @@ using (var scope = app.Services.CreateScope())
     AddColumnIfMissing("email_templates", "branded", "INTEGER NOT NULL DEFAULT 1");
     // 2026-10-07: formatting toolbar — template bodies stored as HTML
     AddColumnIfMissing("email_templates", "is_html", "INTEGER NOT NULL DEFAULT 0");
+    // 2026-10-07: per-user email signature ({{signature}})
+    AddColumnIfMissing("users", "email_signature", "TEXT");
 
     // 2026-10-06: settings editable from Admin (Email settings)
     using (var cmd = conn.CreateCommand())

@@ -17,29 +17,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="~/css/saved-leads.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/theme.css" asp-append-version="true" />
-    <style>
-        /* Formatting toolbar + editor. The editor mimics the email's own font. */
-        .tb-btn { min-width: 30px; height: 30px; padding: 0 6px; border-radius: 8px; color: #4b3b5c; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
-        .tb-btn:hover { background: #fce7f3; color: #e11d74; }
-        .tb-btn.active { background: #e11d74; color: #fff; }
-        .tb-wide { font-size: 12px; font-weight: 600; }
-        .tb-select { height: 30px; border-radius: 8px; border: 1px solid #e9d5ff; background: #fff; font-size: 12px; padding: 0 6px; color: #4b3b5c; }
-        .tb-sep { width: 1px; height: 20px; background: #e9d5ff; margin: 0 4px; }
-        .tb-menu { position: absolute; z-index: 30; top: 34px; left: 0; background: #fff; border: 1px solid #f3d0e4; border-radius: 12px; padding: 10px; box-shadow: 0 10px 25px rgba(0,0,0,.12); width: 170px; }
-        .tb-swatch { width: 24px; height: 24px; border-radius: 6px; border: 1px solid #e5e7eb; }
-        .tb-swatch:hover { transform: scale(1.15); }
-        .tpl-editor { min-height: 18rem; max-height: 36rem; overflow-y: auto; padding: 14px 16px; background: #fff; color: #1f1235;
-                      font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.5; outline: none; }
-        .tpl-editor:empty:before { content: attr(data-placeholder); color: #9ca3af; }
-        .tpl-editor ul { list-style: disc; padding-left: 24px; margin: 4px 0; }
-        .tpl-editor ol { list-style: decimal; padding-left: 24px; margin: 4px 0; }
-        .tpl-editor a { color: #0d9488; text-decoration: underline; }
-        .tpl-editor img { max-width: 100%; height: auto; cursor: pointer; }
-        .tpl-editor img.img-selected { outline: 3px solid #e11d74; outline-offset: 2px; }
-        .tpl-editor.drop-target { background: #fdf2f8; }
-        .tpl-editor blockquote { border-left: 3px solid #0d9488; padding-left: 12px; margin: 8px 0; }
-        #pvBody ul { list-style: disc; } #pvBody ol { list-style: decimal; }
-    </style>
+    <link rel="stylesheet" href="~/css/rich-editor.css" asp-append-version="true" />
+    <style>#pvBody ul { list-style: disc; } #pvBody ol { list-style: decimal; }</style>
 </head>
 <body class="min-h-screen">
 
@@ -125,12 +104,17 @@
                 <a href="/Leads/Saved" class="text-brand font-semibold hover:underline">Traced</a> tab.
             </p>
         </div>
-        @if (canEdit)
-        {
-            <button onclick="newTemplate()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand text-white text-xs font-semibold shadow">
-                <i class="fa-solid fa-plus"></i>New template
+        <div class="flex items-center gap-2">
+            <button onclick="openSignature()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-pink-200 text-pink-700 text-xs font-semibold shadow-sm hover:bg-pink-50">
+                <i class="fa-solid fa-signature"></i>My signature
             </button>
-        }
+            @if (canEdit)
+            {
+                <button onclick="newTemplate()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand text-white text-xs font-semibold shadow">
+                    <i class="fa-solid fa-plus"></i>New template
+                </button>
+            }
+        </div>
     </div>
 </div>
 
@@ -178,87 +162,12 @@
             </div>
             <div>
                 <label class="block text-xs text-slate-400 mb-1">Message</label>
-                <div class="rounded-xl border border-slate-600 overflow-hidden focus-within:border-brand bg-white">
+                <div id="msgEditor" class="rounded-xl border border-slate-600 overflow-hidden focus-within:border-brand bg-white">
                     @if (canEdit)
                     {
-                        <div id="editorToolbar" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-slate-700 bg-slate-900">
-                            <select id="tbFont" class="tb-select" title="Font">
-                                <option value="">Font</option>
-                                <option value="Arial, Helvetica, sans-serif" style="font-family:Arial">Arial</option>
-                                <option value="Georgia, 'Times New Roman', serif" style="font-family:Georgia">Georgia</option>
-                                <option value="Verdana, Geneva, sans-serif" style="font-family:Verdana">Verdana</option>
-                                <option value="'Trebuchet MS', Helvetica, sans-serif" style="font-family:'Trebuchet MS'">Trebuchet</option>
-                                <option value="Tahoma, Geneva, sans-serif" style="font-family:Tahoma">Tahoma</option>
-                                <option value="'Times New Roman', Times, serif" style="font-family:'Times New Roman'">Times</option>
-                                <option value="'Courier New', Courier, monospace" style="font-family:'Courier New'">Courier</option>
-                            </select>
-                            <select id="tbSize" class="tb-select" title="Text size">
-                                <option value="">Size</option>
-                                <option value="13">Small</option>
-                                <option value="15">Normal</option>
-                                <option value="18">Large</option>
-                                <option value="22">Larger</option>
-                                <option value="28">Huge</option>
-                            </select>
-                            <span class="tb-sep"></span>
-                            <button type="button" class="tb-btn" data-cmd="bold" title="Bold (Ctrl+B)"><i class="fa-solid fa-bold"></i></button>
-                            <button type="button" class="tb-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i class="fa-solid fa-italic"></i></button>
-                            <button type="button" class="tb-btn" data-cmd="underline" title="Underline (Ctrl+U)"><i class="fa-solid fa-underline"></i></button>
-                            <button type="button" class="tb-btn" data-cmd="strikeThrough" title="Strikethrough"><i class="fa-solid fa-strikethrough"></i></button>
-                            <span class="relative">
-                                <button type="button" class="tb-btn" data-menu="colorMenu" title="Text color"><i class="fa-solid fa-font" style="border-bottom:3px solid #e11d74"></i></button>
-                                <div id="colorMenu" class="tb-menu hidden">
-                                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-1">Text color</p>
-                                    <div class="grid grid-cols-5 gap-1">
-                                        @foreach (var c in new[] { "#1f1235", "#e11d74", "#0d9488", "#f59e0b", "#7c3aed", "#2563eb", "#16a34a", "#dc2626", "#6b7280", "#ffffff" })
-                                        {
-                                            <button type="button" class="tb-swatch" data-color="@c" style="background:@c" title="@c"></button>
-                                        }
-                                    </div>
-                                    <label class="flex items-center gap-1.5 mt-2 text-xs text-slate-400">Custom <input type="color" id="tbCustomColor" value="#e11d74" class="w-7 h-6 p-0 border-0 bg-transparent"></label>
-                                </div>
-                            </span>
-                            <span class="relative">
-                                <button type="button" class="tb-btn" data-menu="highlightMenu" title="Highlight"><i class="fa-solid fa-highlighter"></i></button>
-                                <div id="highlightMenu" class="tb-menu hidden">
-                                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-1">Highlight</p>
-                                    <div class="grid grid-cols-5 gap-1">
-                                        @foreach (var c in new[] { "#fde047", "#fdba74", "#f9a8d4", "#c4b5fd", "#7dd3fc", "#5eead4", "#86efac", "#fca5a5", "#d1d5db", "#fef9c3" })
-                                        {
-                                            <button type="button" class="tb-swatch" data-highlight="@c" style="background:@c" title="@c"></button>
-                                        }
-                                    </div>
-                                    <label class="flex items-center gap-1.5 mt-2 text-xs text-slate-400">Custom <input type="color" id="tbCustomHighlight" value="#fde047" class="w-7 h-6 p-0 border-0 bg-transparent"></label>
-                                    <button type="button" class="mt-1 text-xs text-slate-400 hover:text-brand" data-highlight="transparent"><i class="fa-solid fa-ban mr-1"></i>No highlight</button>
-                                </div>
-                            </span>
-                            <span class="tb-sep"></span>
-                            <button type="button" class="tb-btn" data-cmd="justifyLeft" title="Align left"><i class="fa-solid fa-align-left"></i></button>
-                            <button type="button" class="tb-btn" data-cmd="justifyCenter" title="Center"><i class="fa-solid fa-align-center"></i></button>
-                            <button type="button" class="tb-btn" data-cmd="justifyRight" title="Align right"><i class="fa-solid fa-align-right"></i></button>
-                            <button type="button" class="tb-btn" data-cmd="insertUnorderedList" title="Bullet list"><i class="fa-solid fa-list-ul"></i></button>
-                            <button type="button" class="tb-btn" data-cmd="insertOrderedList" title="Numbered list"><i class="fa-solid fa-list-ol"></i></button>
-                            <span class="tb-sep"></span>
-                            <button type="button" class="tb-btn" onclick="addLink()" title="Link"><i class="fa-solid fa-link"></i></button>
-                            <button type="button" class="tb-btn tb-wide" onclick="addButton()" title="A colored button that links somewhere"><i class="fa-solid fa-hand-pointer mr-1"></i>Button</button>
-                            <button type="button" class="tb-btn tb-wide" onclick="pickImage()" title="Add a picture (PNG, JPG, GIF or WebP). You can also paste or drag one in."><i class="fa-solid fa-image mr-1"></i>Image</button>
-                            <input type="file" id="tbImageFile" accept="image/png,image/jpeg,image/gif,image/webp" class="hidden">
-                            <button type="button" class="tb-btn tb-wide" onclick="insertLogo()" title="Your Company Profile logo"><i class="fa-solid fa-certificate mr-1"></i>Logo</button>
-                            <span class="tb-sep"></span>
-                            <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear formatting"><i class="fa-solid fa-text-slash"></i></button>
-                            <button type="button" class="tb-btn" data-cmd="undo" title="Undo (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
-                            <button type="button" class="tb-btn" data-cmd="redo" title="Redo (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></button>
-                        </div>
+                        <partial name="_RichToolbar" />
                     }
-                    <!-- Shown when an image in the message is clicked -->
-                    <div id="imgMenu" class="hidden fixed z-40 flex items-center gap-1 bg-white border border-pink-200 rounded-xl shadow-lg px-1.5 py-1 text-xs font-semibold">
-                        <button type="button" class="tb-btn tb-wide" data-img-size="small">Small</button>
-                        <button type="button" class="tb-btn tb-wide" data-img-size="medium">Medium</button>
-                        <button type="button" class="tb-btn tb-wide" data-img-size="full">Full width</button>
-                        <span class="tb-sep"></span>
-                        <button type="button" class="tb-btn tb-wide text-red-600" data-img-size="remove"><i class="fa-solid fa-trash mr-1"></i>Remove</button>
-                    </div>
-                    <div id="tplBody" class="tpl-editor" contenteditable="@(canEdit ? "true" : "false")" spellcheck="true"
+                    <div class="rt-body" contenteditable="@(canEdit ? "true" : "false")" spellcheck="true"
                          data-placeholder="Hi {{first_name|there}},"></div>
                 </div>
             </div>
@@ -279,6 +188,8 @@
                         name is unknown (for example when the owner is a company or trust).
                     </p>
                     <div class="text-xs text-slate-500 mt-2 space-y-0.5">
+                        <p><b class="text-slate-400">Signature:</b> the <b>Signature</b> button adds <code class="bg-slate-900 px-1 rounded">{{signature}}</code>,
+                           which becomes the signature of whoever sends the email. Each person sets theirs with <b>My signature</b> at the top.</p>
                         <p><b class="text-slate-400">Logo &amp; buttons</b> show as short codes while you type, and the preview shows what they'll look like.
                            Change the logo size with <code class="bg-slate-900 px-1 rounded">{{logo|small}}</code> or <code class="bg-slate-900 px-1 rounded">{{logo|large}}</code>.
                            Center a logo or button line with the align buttons.</p>
@@ -306,6 +217,10 @@
                 <i class="fa-solid fa-triangle-exclamation mr-1"></i>Add your business mailing address in
                 <a href="/Company/Settings" class="underline">Company Profile</a> before sending. It's required in every marketing email.
             </p>
+            <p id="noSignatureWarning" class="hidden mb-3 text-xs font-semibold text-sky-800 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
+                <i class="fa-solid fa-signature mr-1"></i>You haven't made a signature yet, so <code>{{signature}}</code> shows just your name.
+                <button type="button" onclick="openSignature()" class="underline">Set up my signature</button>
+            </p>
             <p id="noLogoWarning" class="hidden mb-3 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
                 <i class="fa-solid fa-image mr-1"></i>This template uses <code>{{logo}}</code> but there's no PNG or JPG logo yet, so it's left out.
                 Upload one in <a href="/Company/Settings" class="underline">Company Profile</a>.
@@ -331,7 +246,48 @@
     </section>
 </div>
 
+<!-- Shown when a picture in an editor is clicked -->
+<div id="imgMenu" class="hidden fixed z-[70] flex items-center gap-1 bg-white border border-pink-200 rounded-xl shadow-lg px-1.5 py-1 text-xs font-semibold">
+    <button type="button" class="tb-btn tb-wide" data-img-size="small">Small</button>
+    <button type="button" class="tb-btn tb-wide" data-img-size="medium">Medium</button>
+    <button type="button" class="tb-btn tb-wide" data-img-size="full">Full width</button>
+    <span class="tb-sep"></span>
+    <button type="button" class="tb-btn tb-wide text-red-600" data-img-size="remove"><i class="fa-solid fa-trash mr-1"></i>Remove</button>
+</div>
+
+<!-- My signature -->
+<div id="sigModal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onclick="if (event.target === this) closeSignature()">
+    <div class="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white border border-slate-700 shadow-2xl p-5 space-y-3">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-extrabold text-slate-50"><i class="fa-solid fa-signature text-brand mr-1.5"></i>My email signature</h2>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Goes wherever a template has <code class="bg-slate-900 px-1 rounded">{{signature}}</code>, on emails <b>you</b> send.
+                    Everyone on the team has their own.
+                </p>
+            </div>
+            <button type="button" onclick="closeSignature()" class="text-slate-500 hover:text-brand text-lg"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="sigEditor" class="rounded-xl border border-slate-600 overflow-hidden focus-within:border-brand bg-white">
+            <partial name="_RichToolbar" view-data='new ViewDataDictionary(ViewData) { { "Signature", true } }' />
+            <div class="rt-body rt-short" contenteditable="true" spellcheck="true"
+                 data-placeholder="e.g. Candace Holder · Owner · (214) 555-0100"></div>
+        </div>
+        <p class="text-xs text-slate-500">
+            Tip: put your name, title and phone on separate lines; add your photo or the company logo with <b>Image</b> / <b>Logo</b>.
+            Variables like <code class="bg-slate-900 px-1 rounded">{{sender_name}}</code> work here too.
+        </p>
+        <div class="flex items-center justify-end gap-2 pt-1">
+            <button type="button" onclick="closeSignature()" class="px-4 py-2.5 rounded-xl bg-white border border-slate-600 text-slate-300 text-sm font-semibold">Cancel</button>
+            <button type="button" onclick="saveSignature()" id="sigSaveBtn" class="px-5 py-2.5 rounded-xl bg-brand text-white text-sm font-bold shadow">
+                <i class="fa-solid fa-floppy-disk mr-1.5"></i>Save signature
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>window.CAN_EDIT = @(canEdit ? "true" : "false");</script>
+<script src="~/js/rich-editor.js" asp-append-version="true"></script>
 <script src="~/js/email-templates.js" asp-append-version="true"></script>
 <script src="~/js/mobile-menu.js" asp-append-version="true"></script>
 </body>

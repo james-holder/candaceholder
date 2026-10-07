@@ -57,13 +57,25 @@ namespace CandaceHolder.Services
         /// older templates are plain text with the ** / [text](url) shortcuts.
         /// Formatting is applied before variables so lead data can't add markup.
         /// </summary>
-        public static (string Html, string Text) RenderBody(string body, bool isHtml, Context ctx, string accent, string? logoUrl,
-                                                             string baseUrl)
-        {
-            if (!isHtml)
-                return (Render(ToHtml(body, accent, logoUrl), ctx, htmlEncode: true), Render(ToText(body), ctx));
+        // {{signature}} — the sending user's signature (see RenderBody).
+        public static readonly Regex SignatureToken =
+            new(@"\{\{\s*signature\s*\}\}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-            var clean = EmailHtml.Sanitize(body);
+        /// <param name="signatureHtml">The sender's saved signature; when empty,
+        /// {{signature}} falls back to their name.</param>
+        public static (string Html, string Text) RenderBody(string body, bool isHtml, Context ctx, string accent, string? logoUrl,
+                                                             string baseUrl, string? signatureHtml = null)
+        {
+            // Swapped in before variables are filled, so a signature can use them too.
+            var sig = string.IsNullOrWhiteSpace(signatureHtml) ? null : EmailHtml.Sanitize(signatureHtml);
+
+            if (!isHtml)
+            {
+                body = SignatureToken.Replace(body ?? "", sig == null ? "{{sender_name}}" : EmailHtml.ToPlainText(sig));
+                return (Render(ToHtml(body, accent, logoUrl), ctx, htmlEncode: true), Render(ToText(body), ctx));
+            }
+
+            var clean = SignatureToken.Replace(EmailHtml.Sanitize(body), sig ?? "{{sender_name}}");
             return (Render(EmailHtml.Finish(clean, accent, logoUrl, baseUrl), ctx, htmlEncode: true),
                     Render(ToText(EmailHtml.ToPlainText(clean)), ctx));
         }

@@ -133,6 +133,30 @@ namespace CandaceHolder.Controllers
             return Json(new { deleted = true });
         }
 
+        // ── GET/POST /Email/Signature — the signed-in user's signature ──
+        // Everyone on the team can have their own; {{signature}} in a template
+        // becomes the signature of whoever sends it.
+        [HttpGet("Signature")]
+        public async Task<IActionResult> GetSignature() => Json(new { html = await MySignatureAsync() ?? "" });
+
+        [HttpPost("Signature")]
+        public async Task<IActionResult> SaveSignature([FromBody] SignatureDto dto)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == CurrentUserId);
+            if (user == null) return BadRequest(new { error = "Account not found." });
+            var html = EmailHtml.Sanitize(dto.Html ?? "").Trim();
+            if (html.Length > 50000) return BadRequest(new { error = "That signature is too long." });
+            // An editor with nothing typed in it still holds markup like <div><br></div>
+            var empty = EmailHtml.ToPlainText(html).Length == 0 && !html.Contains("<img", StringComparison.OrdinalIgnoreCase)
+                        && !TemplateRenderer.LogoToken.IsMatch(html);
+            user.EmailSignature = empty ? null : html;
+            await _db.SaveChangesAsync();
+            return Json(new { html = user.EmailSignature ?? "" });
+        }
+
+        private async Task<string?> MySignatureAsync() =>
+            await _db.Users.AsNoTracking().Where(u => u.Id == CurrentUserId).Select(u => u.EmailSignature).FirstOrDefaultAsync();
+
         // ── POST /Email/Images — upload a picture for a template ────
         // The editor shrinks big photos before uploading; this checks the
         // file really is an image and stores it on the data volume.
@@ -210,13 +234,16 @@ namespace CandaceHolder.Controllers
 
             var subject   = TemplateRenderer.Render(dto.Subject ?? "", ctx);
             var logoUrl   = LogoUrl(org);
-            var (bodyHtml, bodyText) = TemplateRenderer.RenderBody(dto.Body ?? "", dto.IsHtml == true, ctx, EmailLayout.AccentFor(org), logoUrl, BaseUrl);
+            var signature = await MySignatureAsync();
+            var (bodyHtml, bodyText) = TemplateRenderer.RenderBody(dto.Body ?? "", dto.IsHtml == true, ctx, EmailLayout.AccentFor(org), logoUrl, BaseUrl, signature);
             var (html, _) = EmailLayout.Build(bodyHtml, bodyText, org, logoUrl, "#unsubscribe-link-preview", dto.Branded ?? true);
 
             return Json(new { subject, html, to = ctx.Email, missingAddress = string.IsNullOrWhiteSpace(org?.Address),
                               svgLogo = !string.IsNullOrWhiteSpace(org?.LogoPath) && !EmailLayout.HasEmailLogo(org),
                               // {{logo}} used but there's nothing to show
-                              noLogo  = logoUrl == null && TemplateRenderer.LogoToken.IsMatch(dto.Body ?? "") });
+                              noLogo  = logoUrl == null && TemplateRenderer.LogoToken.IsMatch(dto.Body ?? ""),
+                              // {{signature}} used but this user hasn't made one (their name is used)
+                              noSignature = string.IsNullOrWhiteSpace(signature) && TemplateRenderer.SignatureToken.IsMatch(dto.Body ?? "") });
         }
 
         // ── POST /Email/Send ─────────────────────────────────────────
@@ -232,7 +259,8 @@ namespace CandaceHolder.Controllers
             var orgId = CurrentOrgId;
             var org   = await _db.Orgs.FirstOrDefaultAsync(o => o.Id == orgId);
             if (org == null) return BadRequest(new { error = "No team found for your account." });
-            var logoUrl = LogoUrl(org);
+            var logoUrl   = LogoUrl(org);
+            var signature = await MySignatureAsync();
             if (string.IsNullOrWhiteSpace(org.Address))
                 return BadRequest(new { error = "Add your business mailing address in Company Profile first — the law (CAN-SPAM) requires it in every marketing email." });
 
@@ -271,7 +299,7 @@ namespace CandaceHolder.Controllers
                     // {{email}} is the address this copy is going to.
                     var ctx     = ContextFor(lead, org) with { Email = to };
                     var subject = TemplateRenderer.Render(template.Subject, ctx);
-                    var (bodyHtml, bodyText) = TemplateRenderer.RenderBody(template.Body, template.IsHtml, ctx, EmailLayout.AccentFor(org), logoUrl, BaseUrl);
+                    var (bodyHtml, bodyText) = TemplateRenderer.RenderBody(template.Body, template.IsHtml, ctx, EmailLayout.AccentFor(org), logoUrl, BaseUrl, signature);
                     var unsub   = UnsubscribeUrl(org.Id, to);
                     var (html, text) = EmailLayout.Build(bodyHtml, bodyText, org, logoUrl, unsub, template.Branded);
                     batch.Add((lead, new EmailService.OutgoingEmail(to, subject, html, text, unsub)));
@@ -396,6 +424,11 @@ namespace CandaceHolder.Controllers
             [JsonPropertyName("leadId")]  public long?   LeadId  { get; set; }
             [JsonPropertyName("branded")] public bool?   Branded { get; set; }
             [JsonPropertyName("isHtml")]  public bool?   IsHtml  { get; set; }
+        }
+
+        public class SignatureDto
+        {
+            [JsonPropertyName("html")] public string? Html { get; set; }
         }
 
         public class SendDto

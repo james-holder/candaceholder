@@ -33,6 +33,8 @@ namespace CandaceHolder.Data.Models
         public string? Phone             { get; set; }
         /// <summary>Email used for alert/notification delivery (may differ from login email)</summary>
         public string? NotificationEmail { get; set; }
+        /// <summary>Email signature (sanitized HTML) — fills {{signature}} in emails this user sends.</summary>
+        public string? EmailSignature    { get; set; }
 
         public Org?                      Org          { get; set; }
         public ICollection<Lead>         Leads        { get; set; } = new List<Lead>();

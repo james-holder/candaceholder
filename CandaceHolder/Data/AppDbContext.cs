@@ -83,6 +83,7 @@ namespace CandaceHolder.Data
             m.Entity<User>(e =>
             {
                 e.ToTable("users");
+                e.Property(u => u.EmailSignature).HasColumnName("email_signature");
                 e.HasKey(u => u.Id);
                 e.Property(u => u.Id).HasColumnName("id");
                 e.Property(u => u.Provider).HasColumnName("provider").IsRequired();

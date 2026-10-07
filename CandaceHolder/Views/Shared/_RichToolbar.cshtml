@@ -1,0 +1,82 @@
+@* Formatting toolbar for a RichEditor (wwwroot/js/rich-editor.js). Goes inside
+   the editor's wrapper, above its .rt-body. ViewData["Signature"] = true for the
+   signature editor: no Button / Signature shortcodes there. *@
+@{
+    var forSignature = ViewData["Signature"] is true;
+}
+<div class="rt-toolbar flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-slate-700 bg-slate-900">
+    <select class="rt-font tb-select" title="Font">
+        <option value="">Font</option>
+        <option value="Arial, Helvetica, sans-serif" style="font-family:Arial">Arial</option>
+        <option value="Georgia, 'Times New Roman', serif" style="font-family:Georgia">Georgia</option>
+        <option value="Verdana, Geneva, sans-serif" style="font-family:Verdana">Verdana</option>
+        <option value="'Trebuchet MS', Helvetica, sans-serif" style="font-family:'Trebuchet MS'">Trebuchet</option>
+        <option value="Tahoma, Geneva, sans-serif" style="font-family:Tahoma">Tahoma</option>
+        <option value="'Times New Roman', Times, serif" style="font-family:'Times New Roman'">Times</option>
+        <option value="'Courier New', Courier, monospace" style="font-family:'Courier New'">Courier</option>
+    </select>
+    <select class="rt-size tb-select" title="Text size">
+        <option value="">Size</option>
+        <option value="11">Tiny</option>
+        <option value="13">Small</option>
+        <option value="15">Normal</option>
+        <option value="18">Large</option>
+        <option value="22">Larger</option>
+        <option value="28">Huge</option>
+    </select>
+    <span class="tb-sep"></span>
+    <button type="button" class="tb-btn" data-cmd="bold" title="Bold (Ctrl+B)"><i class="fa-solid fa-bold"></i></button>
+    <button type="button" class="tb-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i class="fa-solid fa-italic"></i></button>
+    <button type="button" class="tb-btn" data-cmd="underline" title="Underline (Ctrl+U)"><i class="fa-solid fa-underline"></i></button>
+    <button type="button" class="tb-btn" data-cmd="strikeThrough" title="Strikethrough"><i class="fa-solid fa-strikethrough"></i></button>
+    <span>
+        <button type="button" class="tb-btn" data-menu title="Text color"><i class="fa-solid fa-font" style="border-bottom:3px solid #e11d74"></i></button>
+        <div class="tb-menu hidden">
+            <p class="text-[10px] font-bold text-slate-500 uppercase mb-1">Text color</p>
+            <div class="grid grid-cols-5 gap-1">
+                @foreach (var c in new[] { "#1f1235", "#e11d74", "#0d9488", "#f59e0b", "#7c3aed", "#2563eb", "#16a34a", "#dc2626", "#6b7280", "#ffffff" })
+                {
+                    <button type="button" class="tb-swatch" data-color="@c" style="background:@c" title="@c"></button>
+                }
+            </div>
+            <label class="flex items-center gap-1.5 mt-2 text-xs text-slate-400">Custom <input type="color" class="rt-custom-color w-7 h-6 p-0 border-0 bg-transparent" value="#e11d74"></label>
+        </div>
+    </span>
+    <span>
+        <button type="button" class="tb-btn" data-menu title="Highlight"><i class="fa-solid fa-highlighter"></i></button>
+        <div class="tb-menu hidden">
+            <p class="text-[10px] font-bold text-slate-500 uppercase mb-1">Highlight</p>
+            <div class="grid grid-cols-5 gap-1">
+                @foreach (var c in new[] { "#fde047", "#fdba74", "#f9a8d4", "#c4b5fd", "#7dd3fc", "#5eead4", "#86efac", "#fca5a5", "#d1d5db", "#fef9c3" })
+                {
+                    <button type="button" class="tb-swatch" data-highlight="@c" style="background:@c" title="@c"></button>
+                }
+            </div>
+            <label class="flex items-center gap-1.5 mt-2 text-xs text-slate-400">Custom <input type="color" class="rt-custom-highlight w-7 h-6 p-0 border-0 bg-transparent" value="#fde047"></label>
+            <button type="button" class="mt-1 text-xs text-slate-400 hover:text-brand" data-highlight="transparent"><i class="fa-solid fa-ban mr-1"></i>No highlight</button>
+        </div>
+    </span>
+    <span class="tb-sep"></span>
+    <button type="button" class="tb-btn" data-cmd="justifyLeft" title="Align left"><i class="fa-solid fa-align-left"></i></button>
+    <button type="button" class="tb-btn" data-cmd="justifyCenter" title="Center"><i class="fa-solid fa-align-center"></i></button>
+    <button type="button" class="tb-btn" data-cmd="justifyRight" title="Align right"><i class="fa-solid fa-align-right"></i></button>
+    <button type="button" class="tb-btn" data-cmd="insertUnorderedList" title="Bullet list"><i class="fa-solid fa-list-ul"></i></button>
+    <button type="button" class="tb-btn" data-cmd="insertOrderedList" title="Numbered list"><i class="fa-solid fa-list-ol"></i></button>
+    <span class="tb-sep"></span>
+    <button type="button" class="tb-btn" data-action="link" title="Link"><i class="fa-solid fa-link"></i></button>
+    @if (!forSignature)
+    {
+        <button type="button" class="tb-btn tb-wide" data-action="button" title="A colored button that links somewhere"><i class="fa-solid fa-hand-pointer mr-1"></i>Button</button>
+    }
+    <button type="button" class="tb-btn tb-wide" data-action="image" title="Add a picture (PNG, JPG, GIF or WebP). You can also paste or drag one in."><i class="fa-solid fa-image mr-1"></i>Image</button>
+    <input type="file" class="rt-file hidden" accept="image/png,image/jpeg,image/gif,image/webp">
+    <button type="button" class="tb-btn tb-wide" data-action="logo" title="Your Company Profile logo"><i class="fa-solid fa-certificate mr-1"></i>Logo</button>
+    @if (!forSignature)
+    {
+        <button type="button" class="tb-btn tb-wide" data-action="signature" title="The signature of whoever sends the email"><i class="fa-solid fa-signature mr-1"></i>Signature</button>
+    }
+    <span class="tb-sep"></span>
+    <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear formatting"><i class="fa-solid fa-text-slash"></i></button>
+    <button type="button" class="tb-btn" data-cmd="undo" title="Undo (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
+    <button type="button" class="tb-btn" data-cmd="redo" title="Redo (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></button>
+</div>
