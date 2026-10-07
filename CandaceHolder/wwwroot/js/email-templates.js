@@ -92,6 +92,15 @@ function insertVariable(text) {
     schedulePreview();
 }
 
+// Logo goes on its own line so it renders as a block image.
+function insertLogo() {
+    var f = document.getElementById('tplBody');
+    var pos = f.selectionStart ?? f.value.length;
+    var before = f.value.slice(0, pos);
+    lastField = f;
+    insertVariable((before && !before.endsWith('\n') ? '\n' : '') + '{{logo}}\n');
+}
+
 function markDirty() { setSaveState('Unsaved changes'); }
 
 function isBranded() {
@@ -124,7 +133,8 @@ async function refreshPreview() {
     document.getElementById('pvSubject').textContent = p.subject || '(no subject)';
     document.getElementById('pvBody').innerHTML      = p.html;   // server-rendered; values are HTML-encoded
     document.getElementById('addressWarning').classList.toggle('hidden', !p.missingAddress);
-    document.getElementById('svgLogoWarning').classList.toggle('hidden', !(p.svgLogo && isBranded()));
+    document.getElementById('svgLogoWarning').classList.toggle('hidden', !(p.svgLogo && (isBranded() || p.noLogo)));
+    document.getElementById('noLogoWarning').classList.toggle('hidden', !p.noLogo || p.svgLogo);
     // Plain emails have no outer padding of their own
     document.getElementById('pvBody').classList.toggle('p-4', !isBranded());
 }

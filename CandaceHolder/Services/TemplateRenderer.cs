@@ -54,14 +54,21 @@ namespace CandaceHolder.Services
         //   [text](https://…)              → link
         //   a [text](https://…) on its own line → button
         //   bare https://… addresses       → link
+        //   {{logo}} / {{logo|small}} / {{logo|large}} → the Company Profile logo
         private static readonly Regex LinkPattern =
             new(@"\[([^\]\n]+)\]\((https?://[^\s)]+)\)|(https?://[^\s<]+[^\s<.,;:!?)])", RegexOptions.Compiled);
         private static readonly Regex ButtonLine =
             new(@"^\s*\[([^\]\n]+)\]\((https?://[^\s)]+)\)\s*$", RegexOptions.Compiled);
         private static readonly Regex Bold = new(@"\*\*(.+?)\*\*", RegexOptions.Compiled);
+        // Not a normal variable: Render leaves it in place and ToHtml swaps in the image.
+        public static readonly Regex LogoToken =
+            new(@"\{\{\s*logo\s*(?:\|\s*(small|medium|large)\s*)?\}\}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex LogoLine =
+            new(@"^\s*\{\{\s*logo\s*(?:\|\s*(small|medium|large)\s*)?\}\}\s*$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         /// <summary>Plain-text body → HTML (escaped, line breaks kept, formatting above applied).</summary>
-        public static string ToHtml(string plainText, string accent = "#0d9488")
+        /// <param name="logoUrl">Absolute logo URL for {{logo}}; null removes the token.</param>
+        public static string ToHtml(string plainText, string accent = "#0d9488", string? logoUrl = null)
         {
             var lines = (plainText ?? "").Replace("\r\n", "\n").Split('\n');
             var sb = new StringBuilder();
@@ -73,7 +80,14 @@ namespace CandaceHolder.Services
                     sb.Append(Button(button.Groups[1].Value, button.Groups[2].Value, accent));
                     continue;   // the button is its own block — no extra line break
                 }
-                sb.Append(InlineHtml(lines[i], accent));
+                var logo = LogoLine.Match(lines[i]);
+                if (logo.Success)
+                {
+                    if (logoUrl != null) sb.Append(Logo(logoUrl, logo.Groups[1].Value, block: true));
+                    continue;
+                }
+                sb.Append(LogoToken.Replace(InlineHtml(lines[i], accent),
+                    m => logoUrl == null ? "" : Logo(logoUrl, m.Groups[1].Value, block: false)));
                 if (i < lines.Length - 1) sb.Append("<br>");
             }
             return sb.ToString();
@@ -82,7 +96,8 @@ namespace CandaceHolder.Services
         /// <summary>Plain-text part of the email: links written out, ** removed.</summary>
         public static string ToText(string body)
         {
-            var text = LinkPattern.Replace(body ?? "", m => m.Groups[3].Success ? m.Value : $"{m.Groups[1].Value}: {m.Groups[2].Value}");
+            var text = LogoToken.Replace(body ?? "", "");
+            text = LinkPattern.Replace(text, m => m.Groups[3].Success ? m.Value : $"{m.Groups[1].Value}: {m.Groups[2].Value}");
             return Bold.Replace(text, "$1");
         }
 
@@ -100,6 +115,13 @@ namespace CandaceHolder.Services
             }
             sb.Append(WebUtility.HtmlEncode(line[pos..]));
             return Bold.Replace(sb.ToString(), "<strong>$1</strong>");
+        }
+
+        private static string Logo(string url, string size, bool block)
+        {
+            var h = size.ToLowerInvariant() switch { "small" => 36, "large" => 100, _ => 60 };
+            return "<img src=\"" + WebUtility.HtmlEncode(url) + "\" alt=\"\" height=\"" + h + "\" style=\"height:" + h +
+                   "px;width:auto;max-width:100%;border:0;" + (block ? "display:block;margin:8px 0" : "vertical-align:middle") + "\">";
         }
 
         private static string Button(string text, string url, string accent) =>

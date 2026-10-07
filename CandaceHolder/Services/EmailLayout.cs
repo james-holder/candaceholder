@@ -46,7 +46,7 @@ namespace CandaceHolder.Services
             {
                 var plain =
                     "<div style=\"" + Font + "font-size:15px;line-height:1.5;color:#1f1235\">" +
-                    TemplateRenderer.ToHtml(body, accent) + "</div>" +
+                    TemplateRenderer.ToHtml(body, accent, logoUrl) + "</div>" +
                     "<hr style=\"border:0;border-top:1px solid #e5e7eb;margin:24px 0 12px\">" +
                     "<div style=\"" + Font + "font-size:12px;color:#6b7280;line-height:1.5\">" + footer + "</div>";
                 return (plain, text);
@@ -73,7 +73,7 @@ namespace CandaceHolder.Services
                 // Message + signature
                 .Append("<tr><td style=\"background:#ffffff;padding:28px;border-radius:0 0 14px 14px;").Append(Font)
                 .Append("font-size:15px;line-height:1.6;color:#1f1235\">")
-                .Append(TemplateRenderer.ToHtml(body, accent))
+                .Append(TemplateRenderer.ToHtml(body, accent, logoUrl))
                 .Append(SignatureHtml(org, accent))
                 .Append("</td></tr>")
                 // Required footer

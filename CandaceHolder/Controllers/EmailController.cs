@@ -150,10 +150,13 @@ namespace CandaceHolder.Controllers
 
             var subject = TemplateRenderer.Render(dto.Subject ?? "", ctx);
             var body    = TemplateRenderer.Render(dto.Body ?? "", ctx);
-            var (html, _) = EmailLayout.Build(body, org, LogoUrl(org), "#unsubscribe-link-preview", dto.Branded ?? true);
+            var logoUrl   = LogoUrl(org);
+            var (html, _) = EmailLayout.Build(body, org, logoUrl, "#unsubscribe-link-preview", dto.Branded ?? true);
 
             return Json(new { subject, html, to = ctx.Email, missingAddress = string.IsNullOrWhiteSpace(org?.Address),
-                              svgLogo = !string.IsNullOrWhiteSpace(org?.LogoPath) && !EmailLayout.HasEmailLogo(org) });
+                              svgLogo = !string.IsNullOrWhiteSpace(org?.LogoPath) && !EmailLayout.HasEmailLogo(org),
+                              // {{logo}} used but there's nothing to show
+                              noLogo  = logoUrl == null && TemplateRenderer.LogoToken.IsMatch(body) });
         }
 
         // ── POST /Email/Send ─────────────────────────────────────────
