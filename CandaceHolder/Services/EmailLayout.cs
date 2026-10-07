@@ -21,6 +21,16 @@ namespace CandaceHolder.Services
         public const string DefaultHeaderColor = "#e11d74";
         public const string DefaultAccentColor = "#0d9488";
 
+        // Header logo sizes offered on the Email Templates page (height in px).
+        public static readonly IReadOnlyList<(string Label, int Height)> HeaderLogoSizes = new[]
+        {
+            ("Small", 40), ("Medium", 56), ("Large", 80), ("Extra large", 110),
+        };
+        public const int DefaultHeaderLogoHeight = 56;
+
+        public static int HeaderLogoHeight(OrgModel? org) =>
+            org?.EmailLogoHeight is int h && HeaderLogoSizes.Any(s => s.Height == h) ? h : DefaultHeaderLogoHeight;
+
         private const string Font = "font-family:Arial,Helvetica,sans-serif;";
 
         /// <param name="bodyHtml">Rendered message (TemplateRenderer.RenderBody).</param>
@@ -56,9 +66,12 @@ namespace CandaceHolder.Services
             var header     = ValidColor(org?.HeaderColor) ?? DefaultHeaderColor;
             var headerText = IsLight(header) ? "#1f1235" : "#ffffff";
 
+            // Wide logos are capped by width so they don't overflow the 600px email
+            var logoH = HeaderLogoHeight(org);
+            var logoW = Math.Min(520, logoH * 5);
             var brand = logoUrl != null
-                ? "<img src=\"" + Enc(logoUrl) + "\" alt=\"" + Enc(company) + "\" height=\"56\" " +
-                  "style=\"display:block;margin:0 auto;max-height:56px;max-width:240px;height:56px;width:auto;border:0\">"
+                ? "<img src=\"" + Enc(logoUrl) + "\" alt=\"" + Enc(company) + "\" height=\"" + logoH + "\" " +
+                  "style=\"display:block;margin:0 auto;max-height:" + logoH + "px;max-width:" + logoW + "px;height:" + logoH + "px;width:auto;border:0\">"
                 : "<div style=\"" + Font + "font-size:22px;font-weight:bold;color:" + headerText + "\">" + Enc(company) + "</div>";
             var tagline = string.IsNullOrWhiteSpace(org?.Tagline) ? "" :
                 "<div style=\"" + Font + "font-size:13px;color:" + headerText + ";opacity:.85;margin-top:6px\">" + Enc(org!.Tagline!.Trim()) + "</div>";

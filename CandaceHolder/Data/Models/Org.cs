@@ -15,6 +15,8 @@ namespace CandaceHolder.Data.Models
         public string? Website        { get; set; }
         /// <summary>Hex color, e.g. #f97316</summary>
         public string? AccentColor    { get; set; }
+        /// <summary>Logo height (px) in the header of branded emails; null = 56</summary>
+        public int?    EmailLogoHeight { get; set; }
         /// <summary>Header background hex color, e.g. #0f172a</summary>
         public string? HeaderColor    { get; set; }
         public string? Tagline        { get; set; }

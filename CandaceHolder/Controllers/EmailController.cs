@@ -66,10 +66,26 @@ namespace CandaceHolder.Controllers
 
         // ── GET /Email/Templates — editor page ───────────────────────
         [HttpGet("Templates")]
-        public IActionResult Templates()
+        public async Task<IActionResult> Templates()
         {
-            ViewBag.CanEdit = CanSend;
+            var org = await _db.Orgs.AsNoTracking().FirstOrDefaultAsync(o => o.Id == CurrentOrgId);
+            ViewBag.CanEdit          = CanSend;
+            ViewBag.LogoUrl          = LogoUrl(org);   // the editor shows {{logo}} as the real logo
+            ViewBag.HeaderLogoHeight = EmailLayout.HeaderLogoHeight(org);
             return View();
+        }
+
+        // ── POST /Email/LogoSize — logo height in branded email headers ──
+        [HttpPost("LogoSize")]
+        public async Task<IActionResult> SaveLogoSize([FromBody] LogoSizeDto dto)
+        {
+            if (!CanSend) return StatusCode(403, new { error = "Only owners and managers can change this." });
+            var org = await _db.Orgs.FirstOrDefaultAsync(o => o.Id == CurrentOrgId);
+            if (org == null) return BadRequest(new { error = "No team found for your account." });
+            if (!EmailLayout.HeaderLogoSizes.Any(s => s.Height == dto.Height)) return BadRequest(new { error = "Unknown size." });
+            org.EmailLogoHeight = dto.Height;
+            await _db.SaveChangesAsync();
+            return Json(new { height = dto.Height });
         }
 
         // ── GET /Email/Templates/List ────────────────────────────────
@@ -424,6 +440,11 @@ namespace CandaceHolder.Controllers
             [JsonPropertyName("leadId")]  public long?   LeadId  { get; set; }
             [JsonPropertyName("branded")] public bool?   Branded { get; set; }
             [JsonPropertyName("isHtml")]  public bool?   IsHtml  { get; set; }
+        }
+
+        public class LogoSizeDto
+        {
+            [JsonPropertyName("height")] public int Height { get; set; }
         }
 
         public class SignatureDto

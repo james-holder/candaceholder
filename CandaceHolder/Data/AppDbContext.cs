@@ -29,6 +29,7 @@ namespace CandaceHolder.Data
             m.Entity<Org>(e =>
             {
                 e.ToTable("orgs");
+                e.Property(o => o.EmailLogoHeight).HasColumnName("email_logo_height");
                 e.HasKey(o => o.Id);
                 e.Property(o => o.Id).HasColumnName("id");
                 e.Property(o => o.Name).HasColumnName("name").IsRequired();

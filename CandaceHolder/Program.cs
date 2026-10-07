@@ -184,6 +184,8 @@ using (var scope = app.Services.CreateScope())
     AddColumnIfMissing("email_templates", "is_html", "INTEGER NOT NULL DEFAULT 0");
     // 2026-10-07: per-user email signature ({{signature}})
     AddColumnIfMissing("users", "email_signature", "TEXT");
+    // 2026-10-07: adjustable logo size in branded email headers
+    AddColumnIfMissing("orgs", "email_logo_height", "INTEGER");
 
     // 2026-10-06: settings editable from Admin (Email settings)
     using (var cmd = conn.CreateCommand())

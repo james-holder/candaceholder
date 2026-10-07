@@ -10,9 +10,11 @@ var sigEditor    = null;      // "My signature"
 document.addEventListener('DOMContentLoaded', function () {
     msgEditor = new RichEditor(document.getElementById('msgEditor'), {
         onChange: schedulePreview,
-        onFocus:  function (ed) { lastField = ed; }
+        onFocus:  function (ed) { lastField = ed; },
+        logoUrl:  window.LOGO_URL
     });
-    sigEditor = new RichEditor(document.getElementById('sigEditor'));
+    sigEditor = new RichEditor(document.getElementById('sigEditor'), { logoUrl: window.LOGO_URL });
+    markHeaderLogoSize(window.HEADER_LOGO_HEIGHT);
     loadTemplates();
 
     document.querySelectorAll('.tpl-field').forEach(function (f) {
@@ -21,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.getElementById('tplName').addEventListener('input', markDirty);
     document.querySelectorAll('input[name=tplStyle]').forEach(function (r) {
-        r.addEventListener('change', function () { markDirty(); refreshPreview(); });
+        r.addEventListener('change', function () { markDirty(); refreshPreview(); showHeaderLogoRow(); });
     });
 
     document.querySelectorAll('.var-chip').forEach(function (chip) {
@@ -62,6 +64,7 @@ function openTemplate(id) {
     document.getElementById('tplSubject').value = t.subject;
     if (t.isHtml) msgEditor.setHtml(t.body); else msgEditor.setText(t.body);
     setBranded(t.branded !== false);
+    showHeaderLogoRow();
     showEditor(true);
     renderList();
     setSaveState('');
@@ -78,6 +81,7 @@ function newTemplate() {
         '...\n\n' +
         'Thanks,\n{{signature}}');
     setBranded(true);
+    showHeaderLogoRow();
     showEditor(true);
     renderList();
     setSaveState('New template, not saved yet');
@@ -183,6 +187,34 @@ async function deleteTemplate() {
     showEditor(false);
     await loadTemplates();
     showToast('Template deleted', true);
+}
+
+// ── Header logo size (branded emails; a company-wide setting) ─────
+async function setHeaderLogoSize(height) {
+    var resp = await fetch('/Email/LogoSize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ height: height })
+    });
+    if (!resp.ok) { showToast('Couldn\'t change the logo size', false); return; }
+    markHeaderLogoSize(height);
+    refreshPreview();
+    showToast(window.LOGO_URL ? 'Header logo size saved for all branded emails' : 'Saved. Upload a logo in Company Profile to see it', true);
+}
+
+function markHeaderLogoSize(height) {
+    document.querySelectorAll('.logo-size-btn').forEach(function (b) {
+        var on = Number(b.dataset.logoHeight) === Number(height);
+        b.classList.toggle('bg-pink-50', on);
+        b.classList.toggle('border-pink-400', on);
+        b.classList.toggle('text-pink-700', on);
+    });
+}
+
+// Only branded emails have a header
+function showHeaderLogoRow() {
+    var row = document.getElementById('headerLogoRow');
+    if (row) row.classList.toggle('hidden', !isBranded());
 }
 
 // ── My signature ──────────────────────────────────────────────────

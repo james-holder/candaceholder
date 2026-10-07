@@ -155,6 +155,17 @@
                               <span class="block text-xs text-slate-500">Looks like a personal email</span></span>
                     </label>
                 </div>
+                @if (canEdit)
+                {
+                    <div id="headerLogoRow" class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+                        <span class="text-slate-400"><i class="fa-solid fa-certificate text-pink-600 mr-1"></i>Header logo size:</span>
+                        @foreach (var (label, h) in CandaceHolder.Services.EmailLayout.HeaderLogoSizes)
+                        {
+                            <button type="button" data-logo-height="@h" onclick="setHeaderLogoSize(@h)"
+                                    class="logo-size-btn px-2.5 py-1 rounded-lg border border-slate-600 bg-white text-slate-300 font-semibold hover:border-pink-300">@label</button>
+                        }
+                    </div>
+                }
                 <p class="text-xs text-slate-500 mt-1.5">
                     Logo, colors, tagline, phone, website and social links come from
                     <a href="/Company/Settings" class="text-brand font-semibold hover:underline">Company Profile</a>.
@@ -286,6 +297,10 @@
     </div>
 </div>
 
+<script>
+    window.LOGO_URL = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string?)ViewBag.LogoUrl));
+    window.HEADER_LOGO_HEIGHT = @((int)ViewBag.HeaderLogoHeight);
+</script>
 <script>window.CAN_EDIT = @(canEdit ? "true" : "false");</script>
 <script src="~/js/rich-editor.js" asp-append-version="true"></script>
 <script src="~/js/email-templates.js" asp-append-version="true"></script>

@@ -6,10 +6,16 @@
 // Uses the browser's built-in editing, set to write inline styles (what email
 // apps keep). The server cleans the HTML before saving or sending.
 //
-//   var ed = new RichEditor(wrapEl, { onChange: fn, onFocus: fn });
+//   var ed = new RichEditor(wrapEl, { onChange: fn, onFocus: fn, logoUrl: url });
+//
+// With logoUrl, {{logo}} codes show as the actual logo (click it to resize);
+// html() turns them back into {{logo}} / {{logo|small}} / {{logo|large}}.
 //   ed.html() / ed.setHtml(html) / ed.setText(text) / ed.insertText(text)
 var RichEditor = (function () {
     var IMG_WIDTHS = { small: 200, medium: 360, full: 544 };   // 544 = message width in the email
+    // {{logo}} heights — must match EmailHtml.Finish / TemplateRenderer.ToHtml
+    var LOGO_HEIGHTS = { small: 36, medium: 60, large: 100 };
+    var LOGO_TOKEN = /\{\{\s*logo\s*(?:\|\s*(small|medium|large)\s*)?\}\}/gi;
     var instances = [];
     var selectedImg = null, imgOwner = null;
     var openMenuBtn = null;    // toolbar button whose color menu is open
@@ -89,6 +95,9 @@ var RichEditor = (function () {
         if (!menu) return;
         if (!img || owner.body.getAttribute('contenteditable') !== 'true') { menu.classList.add('hidden'); return; }
         img.classList.add('img-selected');
+        // Same menu for the logo; its biggest size is "Large" rather than full width
+        var full = menu.querySelector('[data-img-size="full"]');
+        if (full) full.textContent = img.dataset.logoSize ? 'Large' : 'Full width';
         menu.classList.remove('hidden');
         placeImgMenu();
     }
@@ -102,6 +111,10 @@ var RichEditor = (function () {
         if (!img) return;
         if (size === 'remove') {
             img.remove();
+        } else if (img.dataset.logoSize) {
+            var logoSize = size === 'full' ? 'large' : size;
+            img.dataset.logoSize = logoSize;
+            img.style.height = LOGO_HEIGHTS[logoSize] + 'px';
         } else {
             var w = IMG_WIDTHS[size];
             img.setAttribute('width', w);
@@ -153,6 +166,7 @@ var RichEditor = (function () {
         this.opts = opts || {};
         this.body = wrap.querySelector('.rt-body');
         this.toolbar = wrap.querySelector('.rt-toolbar');
+        this.logoUrl = this.opts.logoUrl || null;
         this.savedRange = null;
         instances.push(this);
 
@@ -218,7 +232,7 @@ var RichEditor = (function () {
                     case 'link':      self.addLink(); break;
                     case 'button':    self.addButton(); break;
                     case 'image':     tb.querySelector('.rt-file').click(); break;
-                    case 'logo':      self.insertBlock('{{logo}}'); break;
+                    case 'logo':      self.insertLogo(); break;
                     case 'signature': self.insertBlock('{{signature}}'); break;
                 }
             });
@@ -325,6 +339,26 @@ var RichEditor = (function () {
         this.changed();
     };
 
+    function logoImgHtml(url, size) {
+        size = (size || 'medium').toLowerCase();
+        return '<img src="' + esc(url) + '" alt="Logo" data-logo-size="' + size + '" style="height:' + LOGO_HEIGHTS[size] +
+               'px;width:auto" title="Your logo. Click to change its size.">';
+    }
+
+    // The logo goes on its own line. Shown as the real logo when there is one.
+    RichEditor.prototype.insertLogo = function () {
+        if (!this.logoUrl) { this.insertBlock('{{logo}}'); return; }
+        this.restoreSelection();
+        var sel = window.getSelection();
+        var line = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+        var onEmptyLine = line && line !== this.body && this.body.contains(line) && line.textContent.trim() === '' && !line.querySelector('img');
+        if (!(this.body.textContent.trim() === '' && !this.body.querySelector('img')) && !onEmptyLine)
+            document.execCommand('insertParagraph');
+        document.execCommand('insertHTML', false, logoImgHtml(this.logoUrl));
+        document.execCommand('insertParagraph');
+        this.changed();
+    };
+
     RichEditor.prototype.uploadImage = async function (file) {
         if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) { toast('Use a PNG, JPG, GIF or WebP picture.', false); return; }
         toast('Adding picture…', true);
@@ -354,6 +388,11 @@ var RichEditor = (function () {
         var out = document.createElement('div'), line = null;
         var copy = this.body.cloneNode(true);
         copy.querySelectorAll('.img-selected').forEach(function (i) { i.removeAttribute('class'); });
+        // The logo is saved as its code, so a new logo upload updates every template
+        copy.querySelectorAll('img[data-logo-size]').forEach(function (i) {
+            var s = i.dataset.logoSize;
+            i.replaceWith(document.createTextNode(s === 'medium' ? '{{logo}}' : '{{logo|' + s + '}}'));
+        });
         Array.from(copy.childNodes).forEach(function (n) {
             var block = n.nodeType === 1 && /^(DIV|P|UL|OL|BLOCKQUOTE|HR)$/.test(n.nodeName);
             if (block) { out.appendChild(n); line = null; return; }
@@ -364,7 +403,10 @@ var RichEditor = (function () {
     };
 
     RichEditor.prototype.setHtml = function (html) {
-        this.body.innerHTML = html || '';
+        var url = this.logoUrl;
+        html = html || '';
+        if (url) html = html.replace(LOGO_TOKEN, function (m, size) { return logoImgHtml(url, size); });
+        this.body.innerHTML = html;
         this.savedRange = null;
     };
 
