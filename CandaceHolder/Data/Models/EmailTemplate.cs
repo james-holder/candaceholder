@@ -14,6 +14,8 @@ namespace CandaceHolder.Data.Models
         public string   Body      { get; set; } = "";
         /// <summary>Branded layout (logo, colors from Company Profile) vs. a plain personal-looking email.</summary>
         public bool     Branded   { get; set; } = true;
+        /// <summary>"lead" (Email Templates page) or "admin" (Admin → email a team member).</summary>
+        public string   Kind      { get; set; } = "lead";
         /// <summary>Body is HTML from the formatting toolbar (false = older plain-text template).</summary>
         public bool     IsHtml    { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

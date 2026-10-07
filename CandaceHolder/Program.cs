@@ -127,13 +127,15 @@ using (var scope = app.Services.CreateScope())
 
     var conn = db.Database.GetDbConnection();
     conn.Open();
-    void AddColumnIfMissing(string table, string column, string definition)
+    // Returns true when the column was just added.
+    bool AddColumnIfMissing(string table, string column, string definition)
     {
         using var cmd = conn.CreateCommand();
         cmd.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = '{column}'";
-        if (Convert.ToInt32(cmd.ExecuteScalar()) > 0) return;
+        if (Convert.ToInt32(cmd.ExecuteScalar()) > 0) return false;
         cmd.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
         cmd.ExecuteNonQuery();
+        return true;
     }
 
     // 2026-10-06: BatchData skip tracing — phone type + Do Not Call / litigator flags
@@ -192,6 +194,19 @@ using (var scope = app.Services.CreateScope())
     AddColumnIfMissing("users", "email_signature", "TEXT");
     // 2026-10-07: adjustable logo size in branded email headers
     AddColumnIfMissing("orgs", "email_logo_height", "INTEGER");
+    // 2026-10-07: admin-only templates (Admin → email a team member). The one
+    // that used to be built into the page becomes the first of them.
+    if (AddColumnIfMissing("email_templates", "kind", "TEXT NOT NULL DEFAULT 'lead'"))
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO email_templates (org_id, name, subject, body, branded, is_html, kind, created_at, updated_at)
+            VALUES (0, 'Check-in / re-engagement', 'Checking in',
+                    '<div>Hi {{first_name|there}},</div><div><br></div><div>Just wanted to check in and see how things are going. Let me know if there''s anything I can help with.</div><div><br></div><div>Thanks,</div><div>{{signature}}</div>',
+                    0, 1, 'admin', datetime('now'), datetime('now'))
+            """;
+        cmd.ExecuteNonQuery();
+    }
 
     // 2026-10-06: settings editable from Admin (Email settings)
     using (var cmd = conn.CreateCommand())

@@ -69,49 +69,6 @@ namespace CandaceHolder.Services
             }
         }
 
-        /// <summary>
-        /// Sends one message to a list of recipients via Bcc, so recipients can't
-        /// see each other's addresses. The visible "To" is FromAddress itself.
-        /// Used for admin broadcast emails — see AdminController.EmailAllUsers.
-        /// </summary>
-        public async Task<bool> SendBccBlastAsync(IEnumerable<string> bccAddresses, string subject, string htmlBody)
-        {
-            if (!IsConfigured)
-            {
-                _logger.LogWarning("Email not configured — skipping BCC blast");
-                return false;
-            }
-
-            var recipients = bccAddresses
-                .Where(a => !string.IsNullOrWhiteSpace(a))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            if (recipients.Count == 0)
-            {
-                _logger.LogWarning("BCC blast requested with no recipients — skipping");
-                return false;
-            }
-
-            try
-            {
-                var message = NewMessage(subject, htmlBody);
-                message.To.Add(message.From[0]);
-                foreach (var addr in recipients)
-                {
-                    try { message.Bcc.Add(MailboxAddress.Parse(addr)); }
-                    catch (Exception ex) { _logger.LogWarning(ex, "Skipping malformed BCC address {Addr}", addr); }
-                }
-                await SendCoreAsync(message);
-                _logger.LogInformation("BCC blast sent to {Count} recipient(s): {Subject}", recipients.Count, subject);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send BCC blast to {Count} recipient(s)", recipients.Count);
-                return false;
-            }
-        }
-
         /// <summary>One personalized email in a batch send.</summary>
         public record OutgoingEmail(string To, string Subject, string Html, string Text, string? UnsubscribeUrl);
 

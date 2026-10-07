@@ -17,10 +17,13 @@ namespace CandaceHolder.Controllers
         private readonly SettingsService     _settings;
         private readonly RealDataService     _realData;
         private readonly IMemoryCache        _cache;
+        private readonly IWebHostEnvironment _env;
 
         public AdminController(AppDbContext db, EmailService email, IConfiguration config,
-                               SettingsService settings, RealDataService realData, IMemoryCache cache)
+                               SettingsService settings, RealDataService realData, IMemoryCache cache,
+                               IWebHostEnvironment env)
         {
+            _env        = env;
             _db         = db;
             _email      = email;
             _config     = config;
@@ -399,11 +402,84 @@ namespace CandaceHolder.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // ── Admin templates (Admin → email a team member) ──────────────
+        // Kept apart from lead templates (Kind = "admin") and shared by all admins.
+        [HttpGet("Templates/List")]
+        public async Task<IActionResult> ListTemplates()
+        {
+            if (!IsAdmin()) return StatusCode(403);
+            var list = await _db.EmailTemplates.AsNoTracking()
+                .Where(t => t.Kind == "admin")
+                .OrderBy(t => t.Name)
+                .Select(t => new { t.Id, t.Name, t.Subject, t.Body })
+                .ToListAsync();
+            return Json(list);
+        }
+
+        [HttpPost("Templates/Save")]
+        public async Task<IActionResult> SaveTemplate([FromBody] AdminTemplateDto dto)
+        {
+            if (!IsAdmin()) return StatusCode(403, new { error = "Admins only." });
+            var name    = (dto.Name ?? "").Trim();
+            var subject = (dto.Subject ?? "").Trim();
+            var body    = EmailHtml.Sanitize(dto.Body ?? "").Trim();
+            if (name.Length == 0 || subject.Length == 0 || EmailHtml.ToPlainText(body).Length == 0)
+                return BadRequest(new { error = "Name, subject and message are all required." });
+            if (name.Length > 100 || subject.Length > 200 || body.Length > 100000)
+                return BadRequest(new { error = "That template is too long." });
+
+            Data.Models.EmailTemplate? t;
+            if (dto.Id is long id)
+            {
+                t = await _db.EmailTemplates.FirstOrDefaultAsync(x => x.Id == id && x.Kind == "admin");
+                if (t == null) return NotFound(new { error = "Template not found." });
+            }
+            else
+            {
+                t = new Data.Models.EmailTemplate { Kind = "admin", OrgId = 0, IsHtml = true, Branded = false, CreatedAt = DateTime.UtcNow };
+                _db.EmailTemplates.Add(t);
+            }
+            t.Name = name; t.Subject = subject; t.Body = body; t.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return Json(new { t.Id, t.Name, t.Subject, t.Body });
+        }
+
+        [HttpDelete("Templates/{id:long}")]
+        public async Task<IActionResult> DeleteTemplate(long id)
+        {
+            if (!IsAdmin()) return StatusCode(403, new { error = "Admins only." });
+            var t = await _db.EmailTemplates.FirstOrDefaultAsync(x => x.Id == id && x.Kind == "admin");
+            if (t == null) return NotFound(new { error = "Template not found." });
+            _db.EmailTemplates.Remove(t);
+            await _db.SaveChangesAsync();
+            return Json(new { deleted = true });
+        }
+
+        // An admin message, personalised for one team member: {{first_name}} etc.
+        // filled in, the sender's {{signature}}, and the company logo for {{logo}}.
+        // Plain style, no marketing footer: these are messages to your own team.
+        private async Task<List<EmailService.OutgoingEmail>> BuildAdminEmailsAsync(
+            IEnumerable<Data.Models.User> recipients, string subject, string body)
+        {
+            var me  = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == CurrentUserId);
+            var org = await _db.Orgs.AsNoTracking().FirstOrDefaultAsync(o => o.Id == me!.OrgId);
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var logoUrl = EmailLayout.LogoUrl(org, _env.ContentRootPath, baseUrl);
+            var sender  = User.FindFirst(ClaimTypes.Name)?.Value ?? me?.DisplayName;
+
+            return recipients.Select(u =>
+            {
+                var ctx = new TemplateRenderer.Context(u.DisplayName, u.Email, null, sender, EmailLayout.CompanyName(org));
+                var (html, text) = TemplateRenderer.RenderBody(body, true, ctx, EmailLayout.AccentFor(org), logoUrl, baseUrl, me?.EmailSignature);
+                html = "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1f1235\">" + html + "</div>";
+                return new EmailService.OutgoingEmail(u.Email!, TemplateRenderer.Render(subject, ctx), html, text, null);
+            }).ToList();
+        }
+
         // ── POST /Admin/Users/{id}/Email ───────────────────────────────
-        // Ad-hoc outreach from the admin panel — subject/body come from the
-        // modal on Index.cshtml (either a canned template or freehand text).
-        // Sent via the same EmailService/SMTP setup as password resets,
-        // so no separate mail configuration is needed.
+        // Email one team member from the admin panel. The body is HTML from
+        // the formatting editor in the modal on Index.cshtml (sanitized when
+        // rendered). Same EmailService/SMTP setup as everything else.
         [HttpPost("Users/{id:long}/Email")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EmailUser(long id, string subject, string body)
@@ -417,20 +493,17 @@ namespace CandaceHolder.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            if (string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(body))
+            if (string.IsNullOrWhiteSpace(subject) || EmailHtml.ToPlainText(EmailHtml.Sanitize(body ?? "")).Length == 0)
             {
                 TempData["AdminError"] = "Subject and message are both required.";
                 return RedirectToAction(nameof(Index));
             }
 
-            // The composer is a plain textarea, not rich text — encode then
-            // turn line breaks into <br> so paragraphs survive as HTML email.
-            var htmlBody = "<p>" + System.Net.WebUtility.HtmlEncode(body).Replace("\n", "<br>") + "</p>";
-
-            var sent = await _email.SendAsync(user.Email, subject, htmlBody);
-            TempData[sent ? "AdminOk" : "AdminError"] = sent
+            var emails = await BuildAdminEmailsAsync(new[] { user }, subject, body!);
+            var error  = (await _email.SendManyAsync(emails))[0];
+            TempData[error == null ? "AdminOk" : "AdminError"] = error == null
                 ? $"Email sent to {user.Email}."
-                : $"Failed to send email to {user.Email} — check the app logs for the SMTP error.";
+                : $"Failed to send email to {user.Email}: {error}";
 
             return RedirectToAction(nameof(Index));
         }
@@ -445,32 +518,41 @@ namespace CandaceHolder.Controllers
         {
             if (!IsAdmin()) return Redirect("/");
 
-            if (string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(body))
+            if (string.IsNullOrWhiteSpace(subject) || EmailHtml.ToPlainText(EmailHtml.Sanitize(body ?? "")).Length == 0)
             {
                 TempData["AdminError"] = "Subject and message are both required.";
                 return RedirectToAction(nameof(Index));
             }
 
-            var emails = await _db.Users
-                .Where(u => u.Email != null && u.Email != "")
-                .Select(u => u.Email!)
-                .Distinct()
-                .ToListAsync();
+            // One email per person (not one BCC blast) so {{first_name}} fills in for each.
+            var users = (await _db.Users.AsNoTracking()
+                    .Where(u => u.Email != null && u.Email != "")
+                    .ToListAsync())
+                .GroupBy(u => u.Email!.ToLowerInvariant()).Select(g => g.First())
+                .ToList();
 
-            if (emails.Count == 0)
+            if (users.Count == 0)
             {
                 TempData["AdminError"] = "No users with an email on file.";
                 return RedirectToAction(nameof(Index));
             }
 
-            var htmlBody = "<p>" + System.Net.WebUtility.HtmlEncode(body).Replace("\n", "<br>") + "</p>";
-
-            var sent = await _email.SendBccBlastAsync(emails, subject, htmlBody);
-            TempData[sent ? "AdminOk" : "AdminError"] = sent
-                ? $"Email sent to {emails.Count} user(s)."
-                : "Failed to send the broadcast — check the app logs for the SMTP error.";
+            var emails  = await BuildAdminEmailsAsync(users, subject, body!);
+            var results = await _email.SendManyAsync(emails);
+            var failed  = results.Count(r => r != null);
+            TempData[failed == 0 ? "AdminOk" : "AdminError"] = failed == 0
+                ? $"Email sent to {users.Count} user(s)."
+                : $"Sent to {users.Count - failed} of {users.Count} user(s). First error: {results.First(r => r != null)}";
 
             return RedirectToAction(nameof(Index));
+        }
+
+        public class AdminTemplateDto
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("id")]      public long?   Id      { get; set; }
+            [System.Text.Json.Serialization.JsonPropertyName("name")]    public string? Name    { get; set; }
+            [System.Text.Json.Serialization.JsonPropertyName("subject")] public string? Subject { get; set; }
+            [System.Text.Json.Serialization.JsonPropertyName("body")]    public string? Body    { get; set; }
         }
 
         public class UserRow

@@ -98,6 +98,18 @@ namespace CandaceHolder.Services
             return (html, text);
         }
 
+        /// <summary>
+        /// Absolute link to the Company Profile logo for emails, or null. ?v= changes
+        /// when the file does, so email apps that cache images pick up a new logo.
+        /// </summary>
+        public static string? LogoUrl(OrgModel? org, string contentRootPath, string baseUrl)
+        {
+            if (!HasEmailLogo(org)) return null;
+            var file = Path.Combine(contentRootPath, "App_Data", "logos", Path.GetFileName(org!.LogoPath!));
+            if (!File.Exists(file)) return null;
+            return $"{baseUrl}/Company/Logo/{org.Id}?v={File.GetLastWriteTimeUtc(file).Ticks}";
+        }
+
         /// <summary>Logo usable in email, or null. Gmail and Outlook don't show SVG.</summary>
         public static bool HasEmailLogo(OrgModel? org) =>
             !string.IsNullOrWhiteSpace(org?.LogoPath) &&

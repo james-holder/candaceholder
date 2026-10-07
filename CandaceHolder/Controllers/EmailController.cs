@@ -94,7 +94,7 @@ namespace CandaceHolder.Controllers
         {
             var orgId = CurrentOrgId;
             var list = await _db.EmailTemplates.AsNoTracking()
-                .Where(t => t.OrgId == orgId)
+                .Where(t => t.OrgId == orgId && t.Kind == "lead")
                 .OrderBy(t => t.Name)
                 .Select(t => new { t.Id, t.Name, t.Subject, t.Body, t.Branded, t.IsHtml, t.UpdatedAt })
                 .ToListAsync();
@@ -122,7 +122,7 @@ namespace CandaceHolder.Controllers
             EmailTemplate? t;
             if (dto.Id is long id)
             {
-                t = await _db.EmailTemplates.FirstOrDefaultAsync(x => x.Id == id && x.OrgId == orgId);
+                t = await _db.EmailTemplates.FirstOrDefaultAsync(x => x.Id == id && x.OrgId == orgId && x.Kind == "lead");
                 if (t == null) return NotFound(new { error = "Template not found." });
             }
             else
@@ -142,7 +142,7 @@ namespace CandaceHolder.Controllers
         {
             if (!CanSend) return StatusCode(403, new { error = "Only owners and managers can delete templates." });
             var orgId = CurrentOrgId;
-            var t = await _db.EmailTemplates.FirstOrDefaultAsync(x => x.Id == id && x.OrgId == orgId);
+            var t = await _db.EmailTemplates.FirstOrDefaultAsync(x => x.Id == id && x.OrgId == orgId && x.Kind == "lead");
             if (t == null) return NotFound(new { error = "Template not found." });
             _db.EmailTemplates.Remove(t);
             await _db.SaveChangesAsync();
@@ -280,7 +280,7 @@ namespace CandaceHolder.Controllers
             if (string.IsNullOrWhiteSpace(org.Address))
                 return BadRequest(new { error = "Add your business mailing address in Company Profile first — the law (CAN-SPAM) requires it in every marketing email." });
 
-            var template = await _db.EmailTemplates.FirstOrDefaultAsync(t => t.Id == dto.TemplateId && t.OrgId == orgId);
+            var template = await _db.EmailTemplates.FirstOrDefaultAsync(t => t.Id == dto.TemplateId && t.OrgId == orgId && t.Kind == "lead");
             if (template == null) return NotFound(new { error = "Template not found." });
 
             var leads = await _db.Leads
@@ -393,13 +393,7 @@ namespace CandaceHolder.Controllers
 
         // Absolute link to the Company Profile logo; ?v= changes when the file
         // does, so email clients that cache images pick up a new logo.
-        private string? LogoUrl(Data.Models.Org? org)
-        {
-            if (!EmailLayout.HasEmailLogo(org)) return null;
-            var file = Path.Combine(_env.ContentRootPath, "App_Data", "logos", Path.GetFileName(org!.LogoPath!));
-            if (!System.IO.File.Exists(file)) return null;
-            return $"{Request.Scheme}://{Request.Host}/Company/Logo/{org.Id}?v={System.IO.File.GetLastWriteTimeUtc(file).Ticks}";
-        }
+        private string? LogoUrl(Data.Models.Org? org) => EmailLayout.LogoUrl(org, _env.ContentRootPath, BaseUrl);
 
         private TemplateRenderer.Context ContextFor(Lead lead, Data.Models.Org? org) =>
             new(lead.OwnerName, lead.OwnerEmail, lead.Address, SenderName, CompanyName(org));
