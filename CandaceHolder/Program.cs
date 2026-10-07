@@ -8,6 +8,12 @@ using CandaceHolder.Data;
 using CandaceHolder.Data.Models;
 using CandaceHolder.Services;
 
+// The server has no regional setting, so .NET falls back to the invariant culture
+// and money shows as "¤49.79". This app is US-only: dollars and US dates.
+var usCulture = new System.Globalization.CultureInfo("en-US");
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture   = usCulture;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = usCulture;
+
 var builder = WebApplication.CreateBuilder(args);
 var config  = builder.Configuration;
 
