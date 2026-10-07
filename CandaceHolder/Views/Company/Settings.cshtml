@@ -1,8 +1,8 @@
 @model CandaceHolder.Data.Models.Org
 @{
     Layout = null;
-    var accent  = Model.AccentColor ?? "#f97316";
-    var header  = Model.HeaderColor ?? "#0f172a";
+    var accent  = Model.AccentColor ?? CandaceHolder.Services.EmailLayout.DefaultAccentColor;
+    var header  = Model.HeaderColor ?? CandaceHolder.Services.EmailLayout.DefaultHeaderColor;
     var isAdmin = ViewBag.IsAdmin is true;
 }
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
@@ -116,6 +116,7 @@
                 <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
                     <i class="fa-solid fa-image text-brand mr-2 text-xs"></i>Company Logo
                 </h2>
+                <p class="text-xs text-slate-500 -mt-2 mb-4">Shown at the top of branded emails. Use a PNG or JPG; email apps don't show SVG.</p>
                 <div class="flex items-start gap-5">
                     <!-- Preview -->
                     <div id="logoPreview"
@@ -217,6 +218,11 @@
                 <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">
                     <i class="fa-solid fa-palette text-brand mr-2 text-xs"></i>Brand colors
                 </h2>
+                <p class="text-xs text-slate-500 -mt-2 mb-4">
+                    Used in branded emails: the header color fills the top band behind your logo, and the accent color is used for
+                    links, buttons and the stripe under the header.
+                    <a href="/Email/Templates" class="text-brand font-semibold hover:underline">Preview in Email Templates</a>
+                </p>
 
                 <!-- Accent color -->
                 <p class="text-xs text-slate-400 mb-2">Accent color</p>
@@ -233,9 +239,9 @@
                 </div>
                 <div class="flex flex-wrap gap-2 mb-6">
                     @foreach (var (name, hex) in new[] {
-                        ("Orange", "#f97316"), ("Sky Blue", "#0ea5e9"),
-                        ("Forest Green", "#22c55e"), ("Red", "#ef4444"),
-                        ("Royal Purple", "#8b5cf6"), ("Slate", "#64748b")
+                        ("Teal", "#0d9488"), ("Pink", "#e11d74"),
+                        ("Sunny Orange", "#f59e0b"), ("Sky Blue", "#0ea5e9"),
+                        ("Royal Purple", "#8b5cf6"), ("Forest Green", "#16a34a")
                     })
                     {
                         <button type="button" onclick="setColor('@hex')" title="@name"
@@ -259,9 +265,9 @@
                 </div>
                 <div class="flex flex-wrap gap-2">
                     @foreach (var (name, hex) in new[] {
-                        ("Navy", "#0f172a"), ("Charcoal", "#1e293b"),
-                        ("Dark Blue", "#1e3a5f"), ("Dark Green", "#14532d"),
-                        ("Black", "#111111"), ("Slate Gray", "#374151")
+                        ("Pink", "#e11d74"), ("Teal", "#0d9488"),
+                        ("Purple", "#7c3aed"), ("Navy", "#0f172a"),
+                        ("White", "#ffffff"), ("Charcoal", "#1e293b")
                     })
                     {
                         <button type="button" onclick="setHeaderColor('@hex')" title="@name"

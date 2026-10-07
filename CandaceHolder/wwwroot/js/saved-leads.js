@@ -805,7 +805,7 @@ async function previewEmail() {
     var resp = await fetch('/Email/Preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject: t.subject, body: t.body, leadId: lead.id })
+        body: JSON.stringify({ subject: t.subject, body: t.body, leadId: lead.id, branded: t.branded !== false })
     });
     if (!resp.ok) return;
     var p = await resp.json();

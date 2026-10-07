@@ -47,9 +47,12 @@ namespace CandaceHolder.Controllers
         private readonly EmailService          _email;
         private readonly IDataProtector        _unsubTokens;
         private readonly ILogger<EmailController> _logger;
+        private readonly IWebHostEnvironment   _env;
 
-        public EmailController(AppDbContext db, EmailService email, IDataProtectionProvider dp, ILogger<EmailController> logger)
+        public EmailController(AppDbContext db, EmailService email, IDataProtectionProvider dp, ILogger<EmailController> logger,
+                               IWebHostEnvironment env)
         {
+            _env         = env;
             _db          = db;
             _email       = email;
             _unsubTokens = dp.CreateProtector("CandaceHolder.Unsubscribe");
@@ -77,7 +80,7 @@ namespace CandaceHolder.Controllers
             var list = await _db.EmailTemplates.AsNoTracking()
                 .Where(t => t.OrgId == orgId)
                 .OrderBy(t => t.Name)
-                .Select(t => new { t.Id, t.Name, t.Subject, t.Body, t.UpdatedAt })
+                .Select(t => new { t.Id, t.Name, t.Subject, t.Body, t.Branded, t.UpdatedAt })
                 .ToListAsync();
             return Json(list);
         }
@@ -109,9 +112,9 @@ namespace CandaceHolder.Controllers
                 t = new EmailTemplate { OrgId = orgId.Value, CreatedAt = DateTime.UtcNow };
                 _db.EmailTemplates.Add(t);
             }
-            t.Name = name; t.Subject = subject; t.Body = body; t.UpdatedAt = DateTime.UtcNow;
+            t.Name = name; t.Subject = subject; t.Body = body; t.Branded = dto.Branded ?? true; t.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
-            return Json(new { t.Id, t.Name, t.Subject, t.Body, t.UpdatedAt });
+            return Json(new { t.Id, t.Name, t.Subject, t.Body, t.Branded, t.UpdatedAt });
         }
 
         // ── DELETE /Email/Templates/{id} ─────────────────────────────
@@ -147,9 +150,10 @@ namespace CandaceHolder.Controllers
 
             var subject = TemplateRenderer.Render(dto.Subject ?? "", ctx);
             var body    = TemplateRenderer.Render(dto.Body ?? "", ctx);
-            var (html, _) = WithFooter(body, org, "#unsubscribe-link-preview");
+            var (html, _) = EmailLayout.Build(body, org, LogoUrl(org), "#unsubscribe-link-preview", dto.Branded ?? true);
 
-            return Json(new { subject, html, to = ctx.Email, missingAddress = string.IsNullOrWhiteSpace(org?.Address) });
+            return Json(new { subject, html, to = ctx.Email, missingAddress = string.IsNullOrWhiteSpace(org?.Address),
+                              svgLogo = !string.IsNullOrWhiteSpace(org?.LogoPath) && !EmailLayout.HasEmailLogo(org) });
         }
 
         // ── POST /Email/Send ─────────────────────────────────────────
@@ -165,6 +169,7 @@ namespace CandaceHolder.Controllers
             var orgId = CurrentOrgId;
             var org   = await _db.Orgs.FirstOrDefaultAsync(o => o.Id == orgId);
             if (org == null) return BadRequest(new { error = "No team found for your account." });
+            var logoUrl = LogoUrl(org);
             if (string.IsNullOrWhiteSpace(org.Address))
                 return BadRequest(new { error = "Add your business mailing address in Company Profile first — the law (CAN-SPAM) requires it in every marketing email." });
 
@@ -205,7 +210,7 @@ namespace CandaceHolder.Controllers
                     var subject = TemplateRenderer.Render(template.Subject, ctx);
                     var body    = TemplateRenderer.Render(template.Body, ctx);
                     var unsub   = UnsubscribeUrl(org.Id, to);
-                    var (html, text) = WithFooter(body, org, unsub);
+                    var (html, text) = EmailLayout.Build(body, org, logoUrl, unsub, template.Branded);
                     batch.Add((lead, new EmailService.OutgoingEmail(to, subject, html, text, unsub)));
                 }
             }
@@ -277,33 +282,20 @@ namespace CandaceHolder.Controllers
         // ── Helpers ──────────────────────────────────────────────────
         private string? SenderName => User.FindFirst(ClaimTypes.Name)?.Value;
 
-        private static string? CompanyName(Data.Models.Org? org) =>
-            string.IsNullOrWhiteSpace(org?.CompanyName) ? org?.Name : org.CompanyName;
+        private static string? CompanyName(Data.Models.Org? org) => EmailLayout.CompanyName(org);
+
+        // Absolute link to the Company Profile logo; ?v= changes when the file
+        // does, so email clients that cache images pick up a new logo.
+        private string? LogoUrl(Data.Models.Org? org)
+        {
+            if (!EmailLayout.HasEmailLogo(org)) return null;
+            var file = Path.Combine(_env.ContentRootPath, "App_Data", "logos", Path.GetFileName(org!.LogoPath!));
+            if (!System.IO.File.Exists(file)) return null;
+            return $"{Request.Scheme}://{Request.Host}/Company/Logo/{org.Id}?v={System.IO.File.GetLastWriteTimeUtc(file).Ticks}";
+        }
 
         private TemplateRenderer.Context ContextFor(Lead lead, Data.Models.Org? org) =>
             new(lead.OwnerName, lead.OwnerEmail, lead.Address, SenderName, CompanyName(org));
-
-        // Appends the required footer: who it's from, mailing address, unsubscribe.
-        private static (string Html, string Text) WithFooter(string body, Data.Models.Org? org, string unsubscribeUrl)
-        {
-            var company = CompanyName(org) ?? "";
-            var address = org?.Address?.Trim() ?? "";
-
-            var text = body +
-                       "\n\n--\n" + company + (address.Length > 0 ? "\n" + address : "") +
-                       "\nDon't want these emails? Unsubscribe: " + unsubscribeUrl;
-
-            var html =
-                "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1f1235\">" +
-                TemplateRenderer.ToHtml(body) + "</div>" +
-                "<hr style=\"border:0;border-top:1px solid #e5e7eb;margin:24px 0 12px\">" +
-                "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6b7280;line-height:1.5\">" +
-                System.Net.WebUtility.HtmlEncode(company) +
-                (address.Length > 0 ? "<br>" + System.Net.WebUtility.HtmlEncode(address).Replace("\n", "<br>") : "") +
-                "<br>Don't want these emails? <a href=\"" + unsubscribeUrl + "\" style=\"color:#6b7280\">Unsubscribe</a>" +
-                "</div>";
-            return (html, text);
-        }
 
         private string UnsubscribeUrl(long orgId, string email) =>
             $"{Request.Scheme}://{Request.Host}/u/{_unsubTokens.Protect($"{orgId}|{email.ToLowerInvariant()}")}";
@@ -328,6 +320,7 @@ namespace CandaceHolder.Controllers
             [JsonPropertyName("name")]    public string? Name    { get; set; }
             [JsonPropertyName("subject")] public string? Subject { get; set; }
             [JsonPropertyName("body")]    public string? Body    { get; set; }
+            [JsonPropertyName("branded")] public bool?   Branded { get; set; }
         }
 
         public class PreviewDto
@@ -335,6 +328,7 @@ namespace CandaceHolder.Controllers
             [JsonPropertyName("subject")] public string? Subject { get; set; }
             [JsonPropertyName("body")]    public string? Body    { get; set; }
             [JsonPropertyName("leadId")]  public long?   LeadId  { get; set; }
+            [JsonPropertyName("branded")] public bool?   Branded { get; set; }
         }
 
         public class SendDto

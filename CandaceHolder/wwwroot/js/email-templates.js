@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', function () {
         f.addEventListener('input', schedulePreview);
     });
     document.getElementById('tplName').addEventListener('input', markDirty);
+    document.querySelectorAll('input[name=tplStyle]').forEach(function (r) {
+        r.addEventListener('change', function () { markDirty(); refreshPreview(); });
+    });
 
     document.querySelectorAll('.var-chip').forEach(function (chip) {
         chip.addEventListener('click', function () { insertVariable('{{' + chip.dataset.var + '}}'); });
@@ -49,6 +52,7 @@ function openTemplate(id) {
     document.getElementById('tplName').value    = t.name;
     document.getElementById('tplSubject').value = t.subject;
     document.getElementById('tplBody').value    = t.body;
+    setBranded(t.branded !== false);
     showEditor(true);
     renderList();
     setSaveState('');
@@ -64,6 +68,7 @@ function newTemplate() {
         'My name is {{sender_name}} with {{company_name}}. I\'m reaching out about your property at {{property_address}}.\n\n' +
         '...\n\n' +
         'Thanks,\n{{sender_name}}';
+    setBranded(true);
     showEditor(true);
     renderList();
     setSaveState('New template, not saved yet');
@@ -89,6 +94,14 @@ function insertVariable(text) {
 
 function markDirty() { setSaveState('Unsaved changes'); }
 
+function isBranded() {
+    var r = document.querySelector('input[name=tplStyle]:checked');
+    return !r || r.value === 'branded';
+}
+function setBranded(on) {
+    document.querySelector('input[name=tplStyle][value=' + (on ? 'branded' : 'plain') + ']').checked = true;
+}
+
 function schedulePreview() {
     markDirty();
     clearTimeout(previewTimer);
@@ -101,7 +114,8 @@ async function refreshPreview() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             subject: document.getElementById('tplSubject').value,
-            body:    document.getElementById('tplBody').value
+            body:    document.getElementById('tplBody').value,
+            branded: isBranded()
         })
     });
     if (!resp.ok) return;
@@ -110,6 +124,9 @@ async function refreshPreview() {
     document.getElementById('pvSubject').textContent = p.subject || '(no subject)';
     document.getElementById('pvBody').innerHTML      = p.html;   // server-rendered; values are HTML-encoded
     document.getElementById('addressWarning').classList.toggle('hidden', !p.missingAddress);
+    document.getElementById('svgLogoWarning').classList.toggle('hidden', !(p.svgLogo && isBranded()));
+    // Plain emails have no outer padding of their own
+    document.getElementById('pvBody').classList.toggle('p-4', !isBranded());
 }
 
 async function saveTemplate() {
@@ -123,7 +140,8 @@ async function saveTemplate() {
                 id:      currentId,
                 name:    document.getElementById('tplName').value,
                 subject: document.getElementById('tplSubject').value,
-                body:    document.getElementById('tplBody').value
+                body:    document.getElementById('tplBody').value,
+                branded: isBranded()
             })
         });
         var r = await resp.json();

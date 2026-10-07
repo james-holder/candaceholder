@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace CandaceHolder.Services
@@ -47,13 +49,65 @@ namespace CandaceHolder.Services
             });
         }
 
-        /// <summary>Plain-text body → simple HTML (escaped, line breaks kept, links clickable).</summary>
-        public static string ToHtml(string plainText)
+        // Light formatting for template bodies:
+        //   **bold**                       → bold
+        //   [text](https://…)              → link
+        //   a [text](https://…) on its own line → button
+        //   bare https://… addresses       → link
+        private static readonly Regex LinkPattern =
+            new(@"\[([^\]\n]+)\]\((https?://[^\s)]+)\)|(https?://[^\s<]+[^\s<.,;:!?)])", RegexOptions.Compiled);
+        private static readonly Regex ButtonLine =
+            new(@"^\s*\[([^\]\n]+)\]\((https?://[^\s)]+)\)\s*$", RegexOptions.Compiled);
+        private static readonly Regex Bold = new(@"\*\*(.+?)\*\*", RegexOptions.Compiled);
+
+        /// <summary>Plain-text body → HTML (escaped, line breaks kept, formatting above applied).</summary>
+        public static string ToHtml(string plainText, string accent = "#0d9488")
         {
-            var html = System.Net.WebUtility.HtmlEncode(plainText ?? "");
-            html = Regex.Replace(html, @"(https?://[^\s<]+)", "<a href=\"$1\">$1</a>");
-            return html.Replace("\r\n", "\n").Replace("\n", "<br>");
+            var lines = (plainText ?? "").Replace("\r\n", "\n").Split('\n');
+            var sb = new StringBuilder();
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var button = ButtonLine.Match(lines[i]);
+                if (button.Success)
+                {
+                    sb.Append(Button(button.Groups[1].Value, button.Groups[2].Value, accent));
+                    continue;   // the button is its own block — no extra line break
+                }
+                sb.Append(InlineHtml(lines[i], accent));
+                if (i < lines.Length - 1) sb.Append("<br>");
+            }
+            return sb.ToString();
         }
+
+        /// <summary>Plain-text part of the email: links written out, ** removed.</summary>
+        public static string ToText(string body)
+        {
+            var text = LinkPattern.Replace(body ?? "", m => m.Groups[3].Success ? m.Value : $"{m.Groups[1].Value}: {m.Groups[2].Value}");
+            return Bold.Replace(text, "$1");
+        }
+
+        private static string InlineHtml(string line, string accent)
+        {
+            var sb = new StringBuilder();
+            int pos = 0;
+            foreach (Match m in LinkPattern.Matches(line))
+            {
+                sb.Append(WebUtility.HtmlEncode(line[pos..m.Index]));
+                var (text, url) = m.Groups[3].Success ? (m.Value, m.Value) : (m.Groups[1].Value, m.Groups[2].Value);
+                sb.Append("<a href=\"").Append(WebUtility.HtmlEncode(url)).Append("\" style=\"color:").Append(accent)
+                  .Append(";font-weight:bold\">").Append(WebUtility.HtmlEncode(text)).Append("</a>");
+                pos = m.Index + m.Length;
+            }
+            sb.Append(WebUtility.HtmlEncode(line[pos..]));
+            return Bold.Replace(sb.ToString(), "<strong>$1</strong>");
+        }
+
+        private static string Button(string text, string url, string accent) =>
+            "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:4px 0\"><tr>" +
+            "<td style=\"background:" + accent + ";border-radius:10px\">" +
+            "<a href=\"" + WebUtility.HtmlEncode(url) + "\" style=\"display:inline-block;padding:12px 24px;" +
+            "font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none\">" +
+            WebUtility.HtmlEncode(text) + "</a></td></tr></table>";
 
         private static Dictionary<string, string?> Values(Context ctx)
         {

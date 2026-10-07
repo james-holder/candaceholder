@@ -183,6 +183,7 @@ namespace CandaceHolder.Data
                 e.Property(t => t.Name).HasColumnName("name").IsRequired();
                 e.Property(t => t.Subject).HasColumnName("subject").IsRequired();
                 e.Property(t => t.Body).HasColumnName("body").IsRequired();
+                e.Property(t => t.Branded).HasColumnName("branded");
                 e.Property(t => t.CreatedAt).HasColumnName("created_at");
                 e.Property(t => t.UpdatedAt).HasColumnName("updated_at");
                 e.HasIndex(t => t.OrgId);

@@ -135,10 +135,13 @@ namespace CandaceHolder.Controllers
         }
 
         // GET /Company/Logo/{orgId} — serves logo from the persistent data volume
+        // Public: email clients load it without signing in.
+        [AllowAnonymous]
         [HttpGet("Logo/{id:long}")]
         public IActionResult Logo(long id)
         {
             var logosDir = Path.Combine(_env.ContentRootPath, "App_Data", "logos");
+            if (!Directory.Exists(logosDir)) return NotFound();
             // Find any file whose name starts with the orgId (ext may vary)
             var file = Directory.EnumerateFiles(logosDir)
                 .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == id.ToString());

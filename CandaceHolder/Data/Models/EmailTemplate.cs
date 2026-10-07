@@ -12,6 +12,8 @@ namespace CandaceHolder.Data.Models
         public string   Subject   { get; set; } = "";
         /// <summary>Plain text; line breaks are kept when sent.</summary>
         public string   Body      { get; set; } = "";
+        /// <summary>Branded layout (logo, colors from Company Profile) vs. a plain personal-looking email.</summary>
+        public bool     Branded   { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }

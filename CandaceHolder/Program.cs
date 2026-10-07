@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -177,6 +178,9 @@ using (var scope = app.Services.CreateScope())
         cmd.ExecuteNonQuery();
     }
 
+    // 2026-10-07: branded email layout per template
+    AddColumnIfMissing("email_templates", "branded", "INTEGER NOT NULL DEFAULT 1");
+
     // 2026-10-06: settings editable from Admin (Email settings)
     using (var cmd = conn.CreateCommand())
     {
@@ -243,6 +247,13 @@ using (var scope = app.Services.CreateScope())
 
     conn.Close();
 }
+
+// Fly terminates HTTPS at its proxy — trust X-Forwarded-Proto so links built
+// from the request (unsubscribe links, the email logo) use https.
+var forwarded = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto };
+forwarded.KnownNetworks.Clear();
+forwarded.KnownProxies.Clear();
+app.UseForwardedHeaders(forwarded);
 
 if (!app.Environment.IsDevelopment())
 {
