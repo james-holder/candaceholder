@@ -20,15 +20,15 @@ namespace CandaceHolder.Services
             var s = new HtmlSanitizer();
             s.AllowedTags.Clear();
             foreach (var t in new[] { "div", "p", "br", "b", "strong", "i", "em", "u", "s", "strike",
-                                      "span", "font", "a", "ul", "ol", "li", "blockquote", "hr" })
+                                      "span", "font", "a", "ul", "ol", "li", "blockquote", "hr", "img" })
                 s.AllowedTags.Add(t);
             s.AllowedAttributes.Clear();
-            foreach (var a in new[] { "style", "href", "align", "color", "face", "size" })
+            foreach (var a in new[] { "style", "href", "align", "color", "face", "size", "src", "alt", "width" })
                 s.AllowedAttributes.Add(a);
             s.AllowedCssProperties.Clear();
             foreach (var p in new[] { "color", "background-color", "font-size", "font-family", "font-weight",
                                       "font-style", "text-decoration", "text-decoration-line", "text-align",
-                                      "line-height", "margin-left", "padding-left" })
+                                      "line-height", "margin-left", "padding-left", "width", "max-width", "height" })
                 s.AllowedCssProperties.Add(p);
             s.AllowedSchemes.Clear();
             foreach (var sc in new[] { "http", "https", "mailto", "tel" })
@@ -43,8 +43,26 @@ namespace CandaceHolder.Services
             @"<(script|style|title|head|template|noscript|iframe|object)\b[^>]*>[\s\S]*?</\1\s*>",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        public static string Sanitize(string html) =>
-            Sanitizer.Sanitize(DropWithContent.Replace(html ?? "", ""));
+        // Images uploaded through the editor: /Email/Image/{orgId}/{32 hex}.{ext}
+        public static readonly Regex UploadedImagePath = new(
+            @"^/Email/Image/\d+/[a-f0-9]{32}\.(png|jpg|gif|webp)$", RegexOptions.Compiled);
+        private static readonly Regex ImgTag = new(@"<img\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex ImgSrc = new(@"\bsrc=""([^""]*)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        /// <summary>
+        /// Allowlist-clean the HTML. Images are kept only when they were uploaded
+        /// here (no hot-linked or tracking images); they're stored as relative
+        /// paths and made absolute when the email is built.
+        /// </summary>
+        public static string Sanitize(string html)
+        {
+            var clean = Sanitizer.Sanitize(DropWithContent.Replace(html ?? "", ""));
+            return ImgTag.Replace(clean, m =>
+            {
+                var src = ImgSrc.Match(m.Value);
+                return src.Success && UploadedImagePath.IsMatch(src.Groups[1].Value) ? m.Value : "";
+            });
+        }
 
         private static readonly Regex ButtonBlock = new(
             @"<(div|p)([^>]*)>\s*\[([^\]<]+)\]\((https?://[^\s)<""]+)\)\s*(?:<br\s*/?>)?\s*</\1>",
@@ -59,8 +77,20 @@ namespace CandaceHolder.Services
         /// list styles (email clients and the app's own CSS drop list bullets).
         /// Variables are filled in afterwards, so lead data can't add markup.
         /// </summary>
-        public static string Finish(string html, string accent, string? logoUrl)
+        public static string Finish(string html, string accent, string? logoUrl, string baseUrl)
         {
+            // Uploaded images: absolute links (email apps can't resolve relative ones),
+            // and an outline-free, scalable image.
+            html = ImgTag.Replace(html, m =>
+            {
+                var tag = Regex.Replace(m.Value, @"\bsrc=""/Email/Image/", "src=\"" + baseUrl + "/Email/Image/", RegexOptions.IgnoreCase);
+                var s = Regex.Match(tag, @"\bstyle=""([^""]*)""", RegexOptions.IgnoreCase);
+                var css = (s.Success ? s.Groups[1].Value.TrimEnd().TrimEnd(';') + ";" : "") + "border:0;height:auto;max-width:100%";
+                tag = s.Success ? tag.Remove(s.Index, s.Length).Insert(s.Index, "style=\"" + css + "\"")
+                                : tag.Insert(4, " style=\"" + css + "\"");
+                return tag;
+            });
+
             html = TemplateRenderer.LogoToken.Replace(html, m =>
             {
                 if (logoUrl == null) return "";

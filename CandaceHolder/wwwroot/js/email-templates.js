@@ -112,8 +112,37 @@ function initEditor() {
     // Paste as plain text so other sites' fonts and layouts don't come along
     editor.addEventListener('paste', function (e) {
         e.preventDefault();
-        document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain'));
+        var cd = e.clipboardData || window.clipboardData;
+        var img = Array.from(cd.files || []).find(function (f) { return /^image\//.test(f.type); });
+        if (img) { uploadImage(img); return; }
+        document.execCommand('insertText', false, cd.getData('text/plain'));
     });
+    // Drag a picture in from the desktop
+    editor.addEventListener('dragover', function (e) {
+        if (Array.from(e.dataTransfer.items || []).some(function (i) { return i.kind === 'file'; })) {
+            e.preventDefault();
+            editor.classList.add('drop-target');
+        }
+    });
+    editor.addEventListener('dragleave', function () { editor.classList.remove('drop-target'); });
+    editor.addEventListener('drop', function (e) {
+        editor.classList.remove('drop-target');
+        var img = Array.from(e.dataTransfer.files || []).find(function (f) { return /^image\//.test(f.type); });
+        if (!img) return;
+        e.preventDefault();
+        // Drop where the mouse is
+        var r = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+        if (r) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); savedRange = r.cloneRange(); }
+        uploadImage(img);
+    });
+    // Click a picture to size or remove it
+    editor.addEventListener('click', function (e) {
+        if (e.target.tagName === 'IMG') { selectImage(e.target); e.stopPropagation(); }
+        else selectImage(null);
+    });
+    document.addEventListener('click', function (e) { if (!e.target.closest('#imgMenu, #tplBody')) selectImage(null); });
+    // Keep the size menu next to the picture while the page or editor scrolls
+    window.addEventListener('scroll', function () { if (selectedImg) placeImgMenu(); }, true);
     document.addEventListener('selectionchange', function () {
         var sel = window.getSelection();
         if (sel.rangeCount && editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
@@ -140,6 +169,15 @@ function initEditor() {
         b.addEventListener('click', function () { exec('hiliteColor', b.dataset.highlight); closeMenus(); });
     });
     document.getElementById('tbCustomColor').addEventListener('change', function () { exec('foreColor', this.value); closeMenus(); });
+    document.getElementById('tbCustomHighlight').addEventListener('change', function () { exec('hiliteColor', this.value); closeMenus(); });
+    document.getElementById('tbImageFile').addEventListener('change', function () {
+        if (this.files[0]) uploadImage(this.files[0]);
+        this.value = '';
+    });
+    document.getElementById('imgMenu').addEventListener('mousedown', function (e) { e.preventDefault(); });
+    document.querySelectorAll('[data-img-size]').forEach(function (b) {
+        b.addEventListener('click', function () { sizeImage(b.dataset.imgSize); });
+    });
     document.getElementById('tbFont').addEventListener('change', function () { if (this.value) exec('fontName', this.value); this.value = ''; });
     document.getElementById('tbSize').addEventListener('change', function () { if (this.value) setFontSize(this.value); this.value = ''; });
     document.addEventListener('click', function (e) { if (!e.target.closest('.tb-menu')) closeMenus(); });
@@ -241,6 +279,94 @@ function addButton() {
 }
 function insertLogo() { insertBlock('{{logo}}'); }
 
+// ── Images ────────────────────────────────────────────────────────
+var IMG_WIDTHS = { small: 200, medium: 360, full: 544 };   // 544 = message width in the email
+var selectedImg = null;
+
+function pickImage() { document.getElementById('tbImageFile').click(); }
+
+async function uploadImage(file) {
+    if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) { showToast('Use a PNG, JPG, GIF or WebP picture.', false); return; }
+    showToast('Adding picture…', true);
+    try {
+        var shrunk = await shrinkImage(file);
+        var fd = new FormData();
+        fd.append('file', shrunk.blob, shrunk.name);
+        var resp = await fetch('/Email/Images', { method: 'POST', body: fd });
+        var r = await resp.json().catch(function () { return {}; });
+        if (!resp.ok) throw new Error(r.error || 'HTTP ' + resp.status);
+
+        // Wide pictures fill the message; small ones keep their own size.
+        var w = shrunk.width >= IMG_WIDTHS.medium ? IMG_WIDTHS.full : shrunk.width;
+        var style = w >= IMG_WIDTHS.full ? 'width:100%' : 'width:' + w + 'px';
+        restoreSelection();
+        document.execCommand('insertHTML', false, '<img src="' + esc(r.url) + '" alt="" width="' + w + '" style="' + style + '">');
+        afterEdit();
+        showToast('Picture added. Click it to change the size.', true);
+    } catch (e) {
+        showToast('Couldn\'t add the picture: ' + e.message, false);
+    }
+}
+
+// Photos straight off a phone are huge: scale anything wider than 1200px
+// down (2x the email width, so it stays sharp on retina screens).
+// GIFs are left alone so animations keep working.
+function shrinkImage(file) {
+    return new Promise(function (resolve, reject) {
+        var url = URL.createObjectURL(file), img = new Image();
+        img.onload = function () {
+            URL.revokeObjectURL(url);
+            var max = 1200;
+            if (file.type === 'image/gif' || img.naturalWidth <= max) {
+                if (file.size > 5 * 1024 * 1024) { reject(new Error('pictures must be under 5 MB')); return; }
+                resolve({ blob: file, name: file.name, width: img.naturalWidth });
+                return;
+            }
+            var c = document.createElement('canvas');
+            c.width = max;
+            c.height = Math.round(img.naturalHeight * max / img.naturalWidth);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            var type = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+            c.toBlob(function (b) {
+                resolve({ blob: b, name: 'image' + (type === 'image/png' ? '.png' : '.jpg'), width: max });
+            }, type, 0.85);
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('that file isn\'t a picture this browser can read')); };
+        img.src = url;
+    });
+}
+
+function selectImage(img) {
+    if (selectedImg) selectedImg.classList.remove('img-selected');
+    selectedImg = img;
+    var menu = document.getElementById('imgMenu');
+    if (!menu) return;
+    if (!img || editor.getAttribute('contenteditable') !== 'true') { menu.classList.add('hidden'); return; }
+    img.classList.add('img-selected');
+    menu.classList.remove('hidden');
+    placeImgMenu();
+}
+
+function placeImgMenu() {
+    var menu = document.getElementById('imgMenu'), r = selectedImg.getBoundingClientRect();
+    menu.style.left = Math.max(8, r.left) + 'px';
+    menu.style.top  = Math.max(8, r.top - menu.offsetHeight - 6) + 'px';
+}
+
+function sizeImage(size) {
+    var img = selectedImg;
+    if (!img) return;
+    if (size === 'remove') {
+        img.remove();
+    } else {
+        var w = IMG_WIDTHS[size];
+        img.setAttribute('width', w);
+        img.style.width = size === 'full' ? '100%' : w + 'px';
+    }
+    selectImage(null);
+    schedulePreview();
+}
+
 function insertBlock(code) {
     restoreSelection();
     var sel = window.getSelection();
@@ -260,7 +386,9 @@ function insertBlock(code) {
 // wrapped in a <div> by the browser, so wrap loose top-level pieces.
 function bodyHtml() {
     var out = document.createElement('div'), line = null;
-    Array.from(editor.cloneNode(true).childNodes).forEach(function (n) {
+    var copy = editor.cloneNode(true);
+    copy.querySelectorAll('.img-selected').forEach(function (i) { i.classList.remove('img-selected'); i.removeAttribute('class'); });
+    Array.from(copy.childNodes).forEach(function (n) {
         var block = n.nodeType === 1 && /^(DIV|P|UL|OL|BLOCKQUOTE|HR)$/.test(n.nodeName);
         if (block) { out.appendChild(n); line = null; return; }
         if (!line) { line = document.createElement('div'); out.appendChild(line); }

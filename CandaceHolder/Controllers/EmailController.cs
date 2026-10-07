@@ -133,6 +133,63 @@ namespace CandaceHolder.Controllers
             return Json(new { deleted = true });
         }
 
+        // ── POST /Email/Images — upload a picture for a template ────
+        // The editor shrinks big photos before uploading; this checks the
+        // file really is an image and stores it on the data volume.
+        public const long MaxImageBytes = 5 * 1024 * 1024;
+
+        [HttpPost("Images")]
+        [RequestSizeLimit(MaxImageBytes + 64 * 1024)]
+        public async Task<IActionResult> UploadImage(IFormFile? file)
+        {
+            if (!CanSend) return StatusCode(403, new { error = "Only owners and managers can add images." });
+            var orgId = CurrentOrgId;
+            if (orgId == null) return BadRequest(new { error = "No team found for your account." });
+            if (file == null || file.Length == 0) return BadRequest(new { error = "Choose an image to upload." });
+            if (file.Length > MaxImageBytes) return BadRequest(new { error = "Images must be under 5 MB." });
+
+            var header = new byte[12];
+            await using (var s = file.OpenReadStream()) _ = await s.ReadAsync(header);
+            var ext = ImageExtension(header);
+            if (ext == null) return BadRequest(new { error = "That file isn't a PNG, JPG, GIF or WebP image." });
+
+            var dir = Path.Combine(_env.ContentRootPath, "App_Data", "email-images", orgId.Value.ToString());
+            Directory.CreateDirectory(dir);
+            var name = Guid.NewGuid().ToString("N") + ext;
+            await using (var fs = new FileStream(Path.Combine(dir, name), FileMode.CreateNew))
+                await file.CopyToAsync(fs);
+
+            return Json(new { url = $"/Email/Image/{orgId}/{name}" });
+        }
+
+        // ── GET /Email/Image/{orgId}/{file} — public so email apps can load it ──
+        [AllowAnonymous]
+        [HttpGet("Image/{orgId:long}/{file}")]
+        public IActionResult Image(long orgId, string file)
+        {
+            if (!EmailHtml.UploadedImagePath.IsMatch($"/Email/Image/{orgId}/{file}")) return NotFound();
+            var path = Path.Combine(_env.ContentRootPath, "App_Data", "email-images", orgId.ToString(), file);
+            if (!System.IO.File.Exists(path)) return NotFound();
+            Response.Headers.CacheControl = "public, max-age=31536000, immutable";   // names are never reused
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            var mime = Path.GetExtension(file) switch
+            {
+                ".png" => "image/png", ".gif" => "image/gif", ".webp" => "image/webp", _ => "image/jpeg"
+            };
+            return PhysicalFile(path, mime);
+        }
+
+        // Identify the image type from its first bytes, not the file name.
+        private static string? ImageExtension(byte[] h)
+        {
+            if (h[0] == 0x89 && h[1] == 0x50 && h[2] == 0x4E && h[3] == 0x47) return ".png";
+            if (h[0] == 0xFF && h[1] == 0xD8 && h[2] == 0xFF) return ".jpg";
+            if (h[0] == 0x47 && h[1] == 0x49 && h[2] == 0x46 && h[3] == 0x38) return ".gif";
+            if (h[0] == 0x52 && h[1] == 0x49 && h[2] == 0x46 && h[3] == 0x46 &&
+                h[8] == 0x57 && h[9] == 0x45 && h[10] == 0x42 && h[11] == 0x50) return ".webp";
+            return null;
+        }
+
         // ── POST /Email/Preview ──────────────────────────────────────
         // Renders a subject/body for one lead (or sample data) exactly as it
         // would be sent, footer included.
@@ -153,7 +210,7 @@ namespace CandaceHolder.Controllers
 
             var subject   = TemplateRenderer.Render(dto.Subject ?? "", ctx);
             var logoUrl   = LogoUrl(org);
-            var (bodyHtml, bodyText) = TemplateRenderer.RenderBody(dto.Body ?? "", dto.IsHtml == true, ctx, EmailLayout.AccentFor(org), logoUrl);
+            var (bodyHtml, bodyText) = TemplateRenderer.RenderBody(dto.Body ?? "", dto.IsHtml == true, ctx, EmailLayout.AccentFor(org), logoUrl, BaseUrl);
             var (html, _) = EmailLayout.Build(bodyHtml, bodyText, org, logoUrl, "#unsubscribe-link-preview", dto.Branded ?? true);
 
             return Json(new { subject, html, to = ctx.Email, missingAddress = string.IsNullOrWhiteSpace(org?.Address),
@@ -214,7 +271,7 @@ namespace CandaceHolder.Controllers
                     // {{email}} is the address this copy is going to.
                     var ctx     = ContextFor(lead, org) with { Email = to };
                     var subject = TemplateRenderer.Render(template.Subject, ctx);
-                    var (bodyHtml, bodyText) = TemplateRenderer.RenderBody(template.Body, template.IsHtml, ctx, EmailLayout.AccentFor(org), logoUrl);
+                    var (bodyHtml, bodyText) = TemplateRenderer.RenderBody(template.Body, template.IsHtml, ctx, EmailLayout.AccentFor(org), logoUrl, BaseUrl);
                     var unsub   = UnsubscribeUrl(org.Id, to);
                     var (html, text) = EmailLayout.Build(bodyHtml, bodyText, org, logoUrl, unsub, template.Branded);
                     batch.Add((lead, new EmailService.OutgoingEmail(to, subject, html, text, unsub)));
@@ -302,6 +359,8 @@ namespace CandaceHolder.Controllers
 
         private TemplateRenderer.Context ContextFor(Lead lead, Data.Models.Org? org) =>
             new(lead.OwnerName, lead.OwnerEmail, lead.Address, SenderName, CompanyName(org));
+
+        private string BaseUrl => $"{Request.Scheme}://{Request.Host}";
 
         private string UnsubscribeUrl(long orgId, string email) =>
             $"{Request.Scheme}://{Request.Host}/u/{_unsubTokens.Protect($"{orgId}|{email.ToLowerInvariant()}")}";

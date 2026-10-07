@@ -57,13 +57,14 @@ namespace CandaceHolder.Services
         /// older templates are plain text with the ** / [text](url) shortcuts.
         /// Formatting is applied before variables so lead data can't add markup.
         /// </summary>
-        public static (string Html, string Text) RenderBody(string body, bool isHtml, Context ctx, string accent, string? logoUrl)
+        public static (string Html, string Text) RenderBody(string body, bool isHtml, Context ctx, string accent, string? logoUrl,
+                                                             string baseUrl)
         {
             if (!isHtml)
                 return (Render(ToHtml(body, accent, logoUrl), ctx, htmlEncode: true), Render(ToText(body), ctx));
 
             var clean = EmailHtml.Sanitize(body);
-            return (Render(EmailHtml.Finish(clean, accent, logoUrl), ctx, htmlEncode: true),
+            return (Render(EmailHtml.Finish(clean, accent, logoUrl, baseUrl), ctx, htmlEncode: true),
                     Render(ToText(EmailHtml.ToPlainText(clean)), ctx));
         }
 

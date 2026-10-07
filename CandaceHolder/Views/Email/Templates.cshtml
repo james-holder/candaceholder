@@ -34,6 +34,9 @@
         .tpl-editor ul { list-style: disc; padding-left: 24px; margin: 4px 0; }
         .tpl-editor ol { list-style: decimal; padding-left: 24px; margin: 4px 0; }
         .tpl-editor a { color: #0d9488; text-decoration: underline; }
+        .tpl-editor img { max-width: 100%; height: auto; cursor: pointer; }
+        .tpl-editor img.img-selected { outline: 3px solid #e11d74; outline-offset: 2px; }
+        .tpl-editor.drop-target { background: #fdf2f8; }
         .tpl-editor blockquote { border-left: 3px solid #0d9488; padding-left: 12px; margin: 8px 0; }
         #pvBody ul { list-style: disc; } #pvBody ol { list-style: decimal; }
     </style>
@@ -220,12 +223,13 @@
                                 <div id="highlightMenu" class="tb-menu hidden">
                                     <p class="text-[10px] font-bold text-slate-500 uppercase mb-1">Highlight</p>
                                     <div class="grid grid-cols-5 gap-1">
-                                        @foreach (var c in new[] { "#fef08a", "#fce7f3", "#ccfbf1", "#e0e7ff", "#ffedd5" })
+                                        @foreach (var c in new[] { "#fde047", "#fdba74", "#f9a8d4", "#c4b5fd", "#7dd3fc", "#5eead4", "#86efac", "#fca5a5", "#d1d5db", "#fef9c3" })
                                         {
                                             <button type="button" class="tb-swatch" data-highlight="@c" style="background:@c" title="@c"></button>
                                         }
                                     </div>
-                                    <button type="button" class="mt-2 text-xs text-slate-400 hover:text-brand" data-highlight="transparent"><i class="fa-solid fa-ban mr-1"></i>None</button>
+                                    <label class="flex items-center gap-1.5 mt-2 text-xs text-slate-400">Custom <input type="color" id="tbCustomHighlight" value="#fde047" class="w-7 h-6 p-0 border-0 bg-transparent"></label>
+                                    <button type="button" class="mt-1 text-xs text-slate-400 hover:text-brand" data-highlight="transparent"><i class="fa-solid fa-ban mr-1"></i>No highlight</button>
                                 </div>
                             </span>
                             <span class="tb-sep"></span>
@@ -237,13 +241,23 @@
                             <span class="tb-sep"></span>
                             <button type="button" class="tb-btn" onclick="addLink()" title="Link"><i class="fa-solid fa-link"></i></button>
                             <button type="button" class="tb-btn tb-wide" onclick="addButton()" title="A colored button that links somewhere"><i class="fa-solid fa-hand-pointer mr-1"></i>Button</button>
-                            <button type="button" class="tb-btn tb-wide" onclick="insertLogo()" title="Your Company Profile logo"><i class="fa-solid fa-image mr-1"></i>Logo</button>
+                            <button type="button" class="tb-btn tb-wide" onclick="pickImage()" title="Add a picture (PNG, JPG, GIF or WebP). You can also paste or drag one in."><i class="fa-solid fa-image mr-1"></i>Image</button>
+                            <input type="file" id="tbImageFile" accept="image/png,image/jpeg,image/gif,image/webp" class="hidden">
+                            <button type="button" class="tb-btn tb-wide" onclick="insertLogo()" title="Your Company Profile logo"><i class="fa-solid fa-certificate mr-1"></i>Logo</button>
                             <span class="tb-sep"></span>
                             <button type="button" class="tb-btn" data-cmd="removeFormat" title="Clear formatting"><i class="fa-solid fa-text-slash"></i></button>
                             <button type="button" class="tb-btn" data-cmd="undo" title="Undo (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
                             <button type="button" class="tb-btn" data-cmd="redo" title="Redo (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></button>
                         </div>
                     }
+                    <!-- Shown when an image in the message is clicked -->
+                    <div id="imgMenu" class="hidden fixed z-40 flex items-center gap-1 bg-white border border-pink-200 rounded-xl shadow-lg px-1.5 py-1 text-xs font-semibold">
+                        <button type="button" class="tb-btn tb-wide" data-img-size="small">Small</button>
+                        <button type="button" class="tb-btn tb-wide" data-img-size="medium">Medium</button>
+                        <button type="button" class="tb-btn tb-wide" data-img-size="full">Full width</button>
+                        <span class="tb-sep"></span>
+                        <button type="button" class="tb-btn tb-wide text-red-600" data-img-size="remove"><i class="fa-solid fa-trash mr-1"></i>Remove</button>
+                    </div>
                     <div id="tplBody" class="tpl-editor" contenteditable="@(canEdit ? "true" : "false")" spellcheck="true"
                          data-placeholder="Hi {{first_name|there}},"></div>
                 </div>
@@ -269,6 +283,8 @@
                            Change the logo size with <code class="bg-slate-900 px-1 rounded">{{logo|small}}</code> or <code class="bg-slate-900 px-1 rounded">{{logo|large}}</code>.
                            Center a logo or button line with the align buttons.</p>
                         <p>Pasted text comes in unformatted, so it doesn't bring in odd fonts from other sites. Format it with the toolbar.</p>
+                        <p><b class="text-slate-400">Images:</b> use the Image button, or paste or drag a picture in. Click a picture to change its size or remove it.
+                           Big photos are shrunk automatically so emails stay quick to load.</p>
                     </div>
                 </div>
 
