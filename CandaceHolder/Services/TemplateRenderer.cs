@@ -37,16 +37,34 @@ namespace CandaceHolder.Services
             new(@"\b(LLC|L\.L\.C|INC|CORP|CO|COMPANY|TRUST|TRUSTEE|ESTATE|PARTNERS|LP|LTD|BANK|HOLDINGS|PROPERTIES|ASSOCIATION)\b",
                 RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        public static string Render(string template, Context ctx)
+        /// <param name="htmlEncode">True when filling HTML: lead values are encoded so
+        /// they can't add markup (fallback text is template source, already HTML).</param>
+        public static string Render(string template, Context ctx, bool htmlEncode = false)
         {
             var values = Values(ctx);
             return VarPattern.Replace(template ?? "", m =>
             {
                 var name = m.Groups[1].Value.ToLowerInvariant();
                 if (!values.TryGetValue(name, out var value)) return m.Value;   // unknown — leave visible
-                if (!string.IsNullOrWhiteSpace(value)) return value!;
+                if (!string.IsNullOrWhiteSpace(value)) return htmlEncode ? WebUtility.HtmlEncode(value!) : value!;
                 return m.Groups[2].Success ? m.Groups[2].Value.Trim() : "";
             });
+        }
+
+        /// <summary>
+        /// A template body → the email's HTML and plain-text parts, variables
+        /// filled in. Bodies from the formatting toolbar are HTML (sanitized);
+        /// older templates are plain text with the ** / [text](url) shortcuts.
+        /// Formatting is applied before variables so lead data can't add markup.
+        /// </summary>
+        public static (string Html, string Text) RenderBody(string body, bool isHtml, Context ctx, string accent, string? logoUrl)
+        {
+            if (!isHtml)
+                return (Render(ToHtml(body, accent, logoUrl), ctx, htmlEncode: true), Render(ToText(body), ctx));
+
+            var clean = EmailHtml.Sanitize(body);
+            return (Render(EmailHtml.Finish(clean, accent, logoUrl), ctx, htmlEncode: true),
+                    Render(ToText(EmailHtml.ToPlainText(clean)), ctx));
         }
 
         // Light formatting for template bodies:

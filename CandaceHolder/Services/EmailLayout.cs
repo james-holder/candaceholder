@@ -23,16 +23,17 @@ namespace CandaceHolder.Services
 
         private const string Font = "font-family:Arial,Helvetica,sans-serif;";
 
-        /// <param name="body">Template body with variables already filled in.</param>
+        /// <param name="bodyHtml">Rendered message (TemplateRenderer.RenderBody).</param>
+        /// <param name="bodyText">Plain-text version of the same message.</param>
         /// <param name="logoUrl">Absolute URL of the logo, or null for none.</param>
         public static (string Html, string Text) Build(
-            string body, OrgModel? org, string? logoUrl, string unsubscribeUrl, bool branded)
+            string bodyHtml, string bodyText, OrgModel? org, string? logoUrl, string unsubscribeUrl, bool branded)
         {
             var company = CompanyName(org) ?? "";
             var address = org?.Address?.Trim() ?? "";
-            var accent  = ValidColor(org?.AccentColor) ?? DefaultAccentColor;
+            var accent  = AccentFor(org);
 
-            var text = TemplateRenderer.ToText(body) +
+            var text = bodyText +
                        (branded ? SignatureText(org) : "") +
                        "\n\n--\n" + company + (address.Length > 0 ? "\n" + address : "") +
                        "\nDon't want these emails? Unsubscribe: " + unsubscribeUrl;
@@ -46,7 +47,7 @@ namespace CandaceHolder.Services
             {
                 var plain =
                     "<div style=\"" + Font + "font-size:15px;line-height:1.5;color:#1f1235\">" +
-                    TemplateRenderer.ToHtml(body, accent, logoUrl) + "</div>" +
+                    bodyHtml + "</div>" +
                     "<hr style=\"border:0;border-top:1px solid #e5e7eb;margin:24px 0 12px\">" +
                     "<div style=\"" + Font + "font-size:12px;color:#6b7280;line-height:1.5\">" + footer + "</div>";
                 return (plain, text);
@@ -73,7 +74,7 @@ namespace CandaceHolder.Services
                 // Message + signature
                 .Append("<tr><td style=\"background:#ffffff;padding:28px;border-radius:0 0 14px 14px;").Append(Font)
                 .Append("font-size:15px;line-height:1.6;color:#1f1235\">")
-                .Append(TemplateRenderer.ToHtml(body, accent, logoUrl))
+                .Append(bodyHtml)
                 .Append(SignatureHtml(org, accent))
                 .Append("</td></tr>")
                 // Required footer
@@ -88,6 +89,8 @@ namespace CandaceHolder.Services
         public static bool HasEmailLogo(OrgModel? org) =>
             !string.IsNullOrWhiteSpace(org?.LogoPath) &&
             !org!.LogoPath!.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
+
+        public static string AccentFor(OrgModel? org) => ValidColor(org?.AccentColor) ?? DefaultAccentColor;
 
         public static string? CompanyName(OrgModel? org) =>
             string.IsNullOrWhiteSpace(org?.CompanyName) ? org?.Name : org.CompanyName;

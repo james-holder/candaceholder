@@ -80,7 +80,7 @@ namespace CandaceHolder.Controllers
             var list = await _db.EmailTemplates.AsNoTracking()
                 .Where(t => t.OrgId == orgId)
                 .OrderBy(t => t.Name)
-                .Select(t => new { t.Id, t.Name, t.Subject, t.Body, t.Branded, t.UpdatedAt })
+                .Select(t => new { t.Id, t.Name, t.Subject, t.Body, t.Branded, t.IsHtml, t.UpdatedAt })
                 .ToListAsync();
             return Json(list);
         }
@@ -95,10 +95,12 @@ namespace CandaceHolder.Controllers
 
             var name    = (dto.Name ?? "").Trim();
             var subject = (dto.Subject ?? "").Trim();
-            var body    = (dto.Body ?? "").Trim();
-            if (name.Length == 0 || subject.Length == 0 || body.Length == 0)
+            var isHtml  = dto.IsHtml == true;
+            var body    = isHtml ? EmailHtml.Sanitize(dto.Body ?? "").Trim() : (dto.Body ?? "").Trim();
+            if (name.Length == 0 || subject.Length == 0 || body.Length == 0 ||
+                (isHtml && EmailHtml.ToPlainText(body).Length == 0 && !TemplateRenderer.LogoToken.IsMatch(body)))
                 return BadRequest(new { error = "Name, subject and message are all required." });
-            if (name.Length > 100 || subject.Length > 200 || body.Length > 20000)
+            if (name.Length > 100 || subject.Length > 200 || body.Length > 100000)
                 return BadRequest(new { error = "That template is too long." });
 
             EmailTemplate? t;
@@ -112,9 +114,10 @@ namespace CandaceHolder.Controllers
                 t = new EmailTemplate { OrgId = orgId.Value, CreatedAt = DateTime.UtcNow };
                 _db.EmailTemplates.Add(t);
             }
-            t.Name = name; t.Subject = subject; t.Body = body; t.Branded = dto.Branded ?? true; t.UpdatedAt = DateTime.UtcNow;
+            t.Name = name; t.Subject = subject; t.Body = body; t.IsHtml = isHtml;
+            t.Branded = dto.Branded ?? true; t.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
-            return Json(new { t.Id, t.Name, t.Subject, t.Body, t.Branded, t.UpdatedAt });
+            return Json(new { t.Id, t.Name, t.Subject, t.Body, t.Branded, t.IsHtml, t.UpdatedAt });
         }
 
         // ── DELETE /Email/Templates/{id} ─────────────────────────────
@@ -148,15 +151,15 @@ namespace CandaceHolder.Controllers
                 : new TemplateRenderer.Context("Jane Smith", "jane.smith@example.com",
                       "123 Main Street, Dallas, TX 75201", SenderName, CompanyName(org));
 
-            var subject = TemplateRenderer.Render(dto.Subject ?? "", ctx);
-            var body    = TemplateRenderer.Render(dto.Body ?? "", ctx);
+            var subject   = TemplateRenderer.Render(dto.Subject ?? "", ctx);
             var logoUrl   = LogoUrl(org);
-            var (html, _) = EmailLayout.Build(body, org, logoUrl, "#unsubscribe-link-preview", dto.Branded ?? true);
+            var (bodyHtml, bodyText) = TemplateRenderer.RenderBody(dto.Body ?? "", dto.IsHtml == true, ctx, EmailLayout.AccentFor(org), logoUrl);
+            var (html, _) = EmailLayout.Build(bodyHtml, bodyText, org, logoUrl, "#unsubscribe-link-preview", dto.Branded ?? true);
 
             return Json(new { subject, html, to = ctx.Email, missingAddress = string.IsNullOrWhiteSpace(org?.Address),
                               svgLogo = !string.IsNullOrWhiteSpace(org?.LogoPath) && !EmailLayout.HasEmailLogo(org),
                               // {{logo}} used but there's nothing to show
-                              noLogo  = logoUrl == null && TemplateRenderer.LogoToken.IsMatch(body) });
+                              noLogo  = logoUrl == null && TemplateRenderer.LogoToken.IsMatch(dto.Body ?? "") });
         }
 
         // ── POST /Email/Send ─────────────────────────────────────────
@@ -211,9 +214,9 @@ namespace CandaceHolder.Controllers
                     // {{email}} is the address this copy is going to.
                     var ctx     = ContextFor(lead, org) with { Email = to };
                     var subject = TemplateRenderer.Render(template.Subject, ctx);
-                    var body    = TemplateRenderer.Render(template.Body, ctx);
+                    var (bodyHtml, bodyText) = TemplateRenderer.RenderBody(template.Body, template.IsHtml, ctx, EmailLayout.AccentFor(org), logoUrl);
                     var unsub   = UnsubscribeUrl(org.Id, to);
-                    var (html, text) = EmailLayout.Build(body, org, logoUrl, unsub, template.Branded);
+                    var (html, text) = EmailLayout.Build(bodyHtml, bodyText, org, logoUrl, unsub, template.Branded);
                     batch.Add((lead, new EmailService.OutgoingEmail(to, subject, html, text, unsub)));
                 }
             }
@@ -324,6 +327,7 @@ namespace CandaceHolder.Controllers
             [JsonPropertyName("subject")] public string? Subject { get; set; }
             [JsonPropertyName("body")]    public string? Body    { get; set; }
             [JsonPropertyName("branded")] public bool?   Branded { get; set; }
+            [JsonPropertyName("isHtml")]  public bool?   IsHtml  { get; set; }
         }
 
         public class PreviewDto
@@ -332,6 +336,7 @@ namespace CandaceHolder.Controllers
             [JsonPropertyName("body")]    public string? Body    { get; set; }
             [JsonPropertyName("leadId")]  public long?   LeadId  { get; set; }
             [JsonPropertyName("branded")] public bool?   Branded { get; set; }
+            [JsonPropertyName("isHtml")]  public bool?   IsHtml  { get; set; }
         }
 
         public class SendDto
